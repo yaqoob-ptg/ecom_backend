@@ -86,7 +86,7 @@ const URL = process.env.MONGO_URL;
 let isConnected = false;
 async function connectToMongoDB() {
   try {
-    await mongoose.connect(process.env.MONGO_URI, {
+    await mongoose.connect(process.env.MONGO_URL, {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
