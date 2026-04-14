@@ -32,7 +32,7 @@ router.post('/send-notification', asyncHandler(async (req, res) => {
     if (imageUrl) {
         notificationBody.big_picture = imageUrl;
     }
-try{
+// try{
     // Use createNotification instead of body.id
     const response = await client.createNotification(notificationBody);
     const notificationId = response.id; // No more .body.id
@@ -44,26 +44,26 @@ try{
     
     res.json({ success: true, message: 'Notification sent successfully', data: null });
 
- } catch (error) {
-    // --- THIS PART IS KEY: Extracting the readable error ---
-        let errorData = error.message;
-        if (error.body && typeof error.body.text === 'function') {
-            errorData = await error.body.text(); // Resolves the [Function: text]
-        }
-        // Log the full error to Vercel console
-        console.error("OneSignal Error Details:", error.body || error);
+//  } catch (error) {
+//     // --- THIS PART IS KEY: Extracting the readable error ---
+//         let errorData = error.message;
+//         if (error.body && typeof error.body.text === 'function') {
+//             errorData = await error.body.text(); // Resolves the [Function: text]
+//         }
+//         // Log the full error to Vercel console
+//         console.error("OneSignal Error Details:", error.body || error);
         
-        res.status(error.code || 500).json({ 
-            success: false, 
-            message: 'OneSignal API Error', 
-            error: error.body ? JSON.parse(error.body) : error.message 
-        });
-    }
+//         res.status(error.code || 500).json({ 
+//             success: false, 
+//             message: 'OneSignal API Error', 
+//             error: error.body ? JSON.parse(error.body) : error.message 
+//         });
+//     }
 }));
 
 router.get('/track-notification/:id', asyncHandler(async (req, res) => {
     const notificationId = req.params.id;
-try{
+// try{
     // Use getNotification instead of viewNotification
     const response = await client.getNotification(process.env.ONE_SIGNAL_APP_ID, notificationId);
     const androidStats = response.platform_delivery_stats;
@@ -77,14 +77,14 @@ try{
     };
     
     res.json({ success: true, message: 'success', data: result });
- } catch (error) {
-    let errorData = error.message;
-        if (error.body && typeof error.body.text === 'function') {
-            errorData = await error.body.text();
-        }
-        console.error("Tracking Error:", error.body || error);
-        res.status(error.code || 500).json({ success: false, message: "Failed to fetch tracking data" });
-    }
+//  } catch (error) {
+//     let errorData = error.message;
+//         if (error.body && typeof error.body.text === 'function') {
+//             errorData = await error.body.text();
+//         }
+//         console.error("Tracking Error:", error.body || error);
+//         res.status(error.code || 500).json({ success: false, message: "Failed to fetch tracking data" });
+//     }
 }));
 
 
