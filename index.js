@@ -65,8 +65,10 @@ const ngrok = require('ngrok');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('path');
 const asyncHandler = require('express-async-handler');
 const dotenv = require('dotenv');
+
 dotenv.config();
 
 const app = express();
@@ -74,9 +76,9 @@ const app = express();
 app.use(cors({ origin: '*' }))
 app.use(bodyParser.json());
 //? setting static folder path
-app.use('/image/products', express.static('public/products'));
-app.use('/image/category', express.static('public/category'));
-app.use('/image/poster', express.static('public/posters'));
+app.use('/image/products', express.static(path.join(__dirname, 'public/products')));
+app.use('/image/category', express.static(path.join(__dirname, 'public/category')));
+app.use('/image/poster', express.static(path.join(__dirname, 'public/posters')));
 
 const URL = process.env.MONGO_URL;
 // mongoose.connect(URL);
