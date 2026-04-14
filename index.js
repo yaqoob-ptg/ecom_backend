@@ -115,7 +115,7 @@ async function connectToMongoDB() {
     bufferCommands: false, // Recommended for serverless
   };
 
-  cachedDb = mongoose.connect(process.env.MONGO_URL, opts).then((mongoose) => {
+  cachedDb = mongoose.connect(URL, opts).then((mongoose) => {
     console.log('New MongoDB connection established');
     return mongoose;
   });
