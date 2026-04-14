@@ -45,6 +45,11 @@ try{
     res.json({ success: true, message: 'Notification sent successfully', data: null });
 
  } catch (error) {
+    // --- THIS PART IS KEY: Extracting the readable error ---
+        let errorData = error.message;
+        if (error.body && typeof error.body.text === 'function') {
+            errorData = await error.body.text(); // Resolves the [Function: text]
+        }
         // Log the full error to Vercel console
         console.error("OneSignal Error Details:", error.body || error);
         
@@ -73,6 +78,10 @@ try{
     
     res.json({ success: true, message: 'success', data: result });
  } catch (error) {
+    let errorData = error.message;
+        if (error.body && typeof error.body.text === 'function') {
+            errorData = await error.body.text();
+        }
         console.error("Tracking Error:", error.body || error);
         res.status(error.code || 500).json({ success: false, message: "Failed to fetch tracking data" });
     }
