@@ -83,24 +83,53 @@ const URL = process.env.MONGO_URL;
 // const db = mongoose.connection;
 // db.on('error', (error) => console.error(error));
 // db.once('open', () => console.log('Connected to Database'));
-let isConnected = false;
+// let isConnected = false;
+// async function connectToMongoDB() {
+//   try {
+//     await mongoose.connect(process.env.MONGO_URL);
+//     isConnected = true;
+//     console.log('Connected to MongoDB');
+//   } catch (error) {
+//     console.error('Error connecting to MongoDB:', error);
+//   }
+// }
+// app.use(async (req, res, next) => {
+//   if (!isConnected) {
+//   await  connectToMongoDB();
+//   }
+//   next();
+// });
+let cachedDb = null;
+
 async function connectToMongoDB() {
-  try {
-    await mongoose.connect(process.env.MONGO_URL, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
-    isConnected = true;
-    console.log('Connected to MongoDB');
-  } catch (error) {
-    console.error('Error connecting to MongoDB:', error);
+  // If we already have a connection (or one is in progress), return it
+  if (cachedDb) {
+    return cachedDb;
   }
+
+  // Otherwise, create a new connection
+  // Note: We removed the deprecated options here to stop the warnings
+  const opts = {
+    bufferCommands: false, // Recommended for serverless
+  };
+
+  cachedDb = mongoose.connect(process.env.MONGO_URL, opts).then((mongoose) => {
+    console.log('New MongoDB connection established');
+    return mongoose;
+  });
+
+  return cachedDb;
 }
-app.use((req, res, next) => {
-  if (!isConnected) {
-    connectToMongoDB();
+
+// Updated Middleware
+app.use(async (req, res, next) => {
+  try {
+    await connectToMongoDB();
+    next();
+  } catch (error) {
+    console.error('Database connection error:', error);
+    res.status(500).send('Database connection failed');
   }
-  next();
 });
 // Routes
 app.use('/categories', require('./routes/category'));
@@ -127,7 +156,7 @@ app.use((error, req, res, next) => {
     res.status(500).json({ success: false, message: error.message, data: null });
 });
 
-const PORT = process.env.PORT || 3000; 
+// const PORT = process.env.PORT || 3000; 
 
 // app.listen(PORT, () => {
 //     console.log(`Local host running on http://localhost:${process.env.PORT}`);
