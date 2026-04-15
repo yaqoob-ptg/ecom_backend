@@ -49,10 +49,11 @@ const productSchema = new mongoose.Schema({
             type: String,
             required: true
         },
-        publicId: {         // ← only addition for Cloudinary
-            type: String,
-            required: true
-        }
+       publicId: {
+    type: String,
+    required: false,
+    default: null
+}
     }]
 }, { timestamps: true });
 

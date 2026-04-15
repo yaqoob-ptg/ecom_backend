@@ -228,103 +228,235 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 // ─── CREATE ──────────────────────────────────────────────────────────────────
-router.post('/', asyncHandler(async (req, res) => {
-    upload.fields(multerFields)(req, res, async (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size too large. Max 5MB per image.';
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(400).json({ success: false, message: err.message });
-        }
+// router.post('/', asyncHandler(async (req, res) => {
+//     upload.fields(multerFields)(req, res, async (err) => {
+//         if (err instanceof multer.MulterError) {
+//             if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size too large. Max 5MB per image.';
+//             return res.status(400).json({ success: false, message: err.message });
+//         } else if (err) {
+//             return res.status(400).json({ success: false, message: err.message });
+//         }
 
-        const { name, description, quantity, price, offerPrice,
-                proCategoryId, proSubCategoryId, proBrandId,
-                proVariantTypeId, proVariantId } = req.body;
+//         const { name, description, quantity, price, offerPrice,
+//                 proCategoryId, proSubCategoryId, proBrandId,
+//                 proVariantTypeId, proVariantId } = req.body;
 
-        if (!name || !quantity || !price || !proCategoryId || !proSubCategoryId) {
-            return res.status(400).json({ success: false, message: "Required fields are missing." });
-        }
+//         if (!name || !quantity || !price || !proCategoryId || !proSubCategoryId) {
+//             return res.status(400).json({ success: false, message: "Required fields are missing." });
+//         }
 
-        // Upload each image buffer to Cloudinary
-        const imageUrls = [];
-        for (let i = 0; i < IMAGE_FIELDS.length; i++) {
-            const field = IMAGE_FIELDS[i];
-            if (req.files?.[field]?.[0]) {
-                const { url, publicId } = await uploadToCloudinary(
-                    req.files[field][0].buffer,
-                    'products'
-                );
-                imageUrls.push({ image: i + 1, url, publicId });
-            }
-        }
+//         // Upload each image buffer to Cloudinary
+//         const imageUrls = [];
+//         for (let i = 0; i < IMAGE_FIELDS.length; i++) {
+//             const field = IMAGE_FIELDS[i];
+//             if (req.files?.[field]?.[0]) {
+//                 const { url, publicId } = await uploadToCloudinary(
+//                     req.files[field][0].buffer,
+//                     'products'
+//                 );
+//                 imageUrls.push({ image: i + 1, url, publicId });
+//             }
+//         }
 
-        const newProduct = new Product({
-            name, description, quantity, price, offerPrice,
-            proCategoryId, proSubCategoryId, proBrandId,
-            proVariantTypeId, proVariantId,
-            images: imageUrls,
+//         const newProduct = new Product({
+//             name, description, quantity, price, offerPrice,
+//             proCategoryId, proSubCategoryId, proBrandId,
+//             proVariantTypeId, proVariantId,
+//             images: imageUrls,
+//         });
+
+//         await newProduct.save();
+//         res.json({ success: true, message: "Product created successfully.", data: newProduct });
+//     });
+// }));
+router.post(
+  '/',
+  upload.fields(multerFields),
+  asyncHandler(async (req, res) => {
+
+    const {
+      name, description, quantity, price, offerPrice,
+      proCategoryId, proSubCategoryId, proBrandId,
+      proVariantTypeId, proVariantId
+    } = req.body;
+
+    if (!name || !quantity || !price || !proCategoryId || !proSubCategoryId) {
+      return res.status(400).json({
+        success: false,
+        message: "Required fields are missing."
+      });
+    }
+
+    const imageUrls = [];
+
+    for (let i = 0; i < IMAGE_FIELDS.length; i++) {
+      const field = IMAGE_FIELDS[i];
+
+      if (req.files?.[field]?.[0]) {
+        const file = req.files[field][0];
+
+        const { url, publicId } = await uploadToCloudinary(
+          file.buffer,
+          'products'
+        );
+
+        imageUrls.push({
+          image: i + 1,
+          url,
+          publicId
         });
+      }
+    }
 
-        await newProduct.save();
-        res.json({ success: true, message: "Product created successfully.", data: newProduct });
+    const newProduct = new Product({
+      name,
+      description,
+      quantity,
+      price,
+      offerPrice,
+      proCategoryId,
+      proSubCategoryId,
+      proBrandId,
+      proVariantTypeId,
+      proVariantId,
+      images: imageUrls || []
     });
-}));
+
+    await newProduct.save();
+
+    res.json({
+      success: true,
+      message: "Product created successfully.",
+      data: newProduct
+    });
+  })
+);
 
 // ─── UPDATE ──────────────────────────────────────────────────────────────────
-router.put('/:id', asyncHandler(async (req, res) => {
-    upload.fields(multerFields)(req, res, async (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size too large. Max 5MB per image.';
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(500).json({ success: false, message: err.message });
-        }
+// router.put('/:id', asyncHandler(async (req, res) => {
+//     upload.fields(multerFields)(req, res, async (err) => {
+//         if (err instanceof multer.MulterError) {
+//             if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size too large. Max 5MB per image.';
+//             return res.status(400).json({ success: false, message: err.message });
+//         } else if (err) {
+//             return res.status(500).json({ success: false, message: err.message });
+//         }
 
-        const product = await Product.findById(req.params.id);
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found." });
-        }
+//         const product = await Product.findById(req.params.id);
+//         if (!product) {
+//             return res.status(404).json({ success: false, message: "Product not found." });
+//         }
 
-        // Update text fields
-        const fields = ['name','description','quantity','price','offerPrice',
-                        'proCategoryId','proSubCategoryId','proBrandId',
-                        'proVariantTypeId','proVariantId'];
-        fields.forEach(f => { if (req.body[f] !== undefined) product[f] = req.body[f]; });
+//         // Update text fields
+//         const fields = ['name','description','quantity','price','offerPrice',
+//                         'proCategoryId','proSubCategoryId','proBrandId',
+//                         'proVariantTypeId','proVariantId'];
+//         fields.forEach(f => { if (req.body[f] !== undefined) product[f] = req.body[f]; });
 
-        // Update images — delete old from Cloudinary, upload new
-        for (let i = 0; i < IMAGE_FIELDS.length; i++) {
-            const field = IMAGE_FIELDS[i];
-            const slotNumber = i + 1;
+//         // Update images — delete old from Cloudinary, upload new
+//         for (let i = 0; i < IMAGE_FIELDS.length; i++) {
+//             const field = IMAGE_FIELDS[i];
+//             const slotNumber = i + 1;
 
-            if (req.files?.[field]?.[0]) {
-                const existing = product.images.find(img => img.image === slotNumber);
+//             if (req.files?.[field]?.[0]) {
+//                 const existing = product.images.find(img => img.image === slotNumber);
 
-                // Delete old image from Cloudinary
-                if (existing?.publicId) {
-                    await cloudinary.uploader.destroy(existing.publicId).catch(e =>
-                        console.error(`Cloudinary delete failed for ${existing.publicId}:`, e.message)
-                    );
-                }
+//                 // Delete old image from Cloudinary
+//                 if (existing?.publicId) {
+//                     await cloudinary.uploader.destroy(existing.publicId).catch(e =>
+//                         console.error(`Cloudinary delete failed for ${existing.publicId}:`, e.message)
+//                     );
+//                 }
 
-                // Upload new image
-                const { url, publicId } = await uploadToCloudinary(
-                    req.files[field][0].buffer,
-                    'products'
-                );
+//                 // Upload new image
+//                 const { url, publicId } = await uploadToCloudinary(
+//                     req.files[field][0].buffer,
+//                     'products'
+//                 );
 
-                if (existing) {
-                    existing.url      = url;
-                    existing.publicId = publicId;
-                } else {
-                    product.images.push({ image: slotNumber, url, publicId });
-                }
-            }
-        }
+//                 if (existing) {
+//                     existing.url      = url;
+//                     existing.publicId = publicId;
+//                 } else {
+//                     product.images.push({ image: slotNumber, url, publicId });
+//                 }
+//             }
+//         }
 
-        await product.save();
-        res.json({ success: true, message: "Product updated successfully.", data: product });
+//         await product.save();
+//         res.json({ success: true, message: "Product updated successfully.", data: product });
+//     });
+// }));
+router.put(
+  '/:id',
+  upload.fields(multerFields),
+  asyncHandler(async (req, res) => {
+
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found."
+      });
+    }
+
+    const fields = [
+      'name','description','quantity','price','offerPrice',
+      'proCategoryId','proSubCategoryId','proBrandId',
+      'proVariantTypeId','proVariantId'
+    ];
+
+    fields.forEach(f => {
+      if (req.body[f] !== undefined) product[f] = req.body[f];
     });
-}));
+
+    product.images = product.images || [];
+
+    for (let i = 0; i < IMAGE_FIELDS.length; i++) {
+      const field = IMAGE_FIELDS[i];
+      const slotNumber = i + 1;
+
+      if (req.files?.[field]?.[0]) {
+        const file = req.files[field][0];
+
+        const existing = product.images.find(
+          img => img.image === slotNumber
+        );
+
+        if (existing?.publicId) {
+          await cloudinary.uploader.destroy(existing.publicId).catch(err => {
+            console.error("Cloudinary delete error:", err.message);
+          });
+        }
+
+        const { url, publicId } = await uploadToCloudinary(
+          file.buffer,
+          'products'
+        );
+
+        if (existing) {
+          existing.url = url;
+          existing.publicId = publicId;
+        } else {
+          product.images.push({
+            image: slotNumber,
+            url,
+            publicId
+          });
+        }
+      }
+    }
+
+    await product.save();
+
+    res.json({
+      success: true,
+      message: "Product updated successfully.",
+      data: product
+    });
+  })
+);
 
 // ─── DELETE ──────────────────────────────────────────────────────────────────
 router.delete('/:id', asyncHandler(async (req, res) => {

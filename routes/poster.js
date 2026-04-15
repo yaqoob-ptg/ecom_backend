@@ -161,78 +161,179 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 // ─── CREATE POSTER ────────────────────────────────────────────────────────────
-router.post('/', asyncHandler(async (req, res) => {
-    upload.single('img')(req, res, async (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(400).json({ success: false, message: err.message });
-        }
+// router.post('/', asyncHandler(async (req, res) => {
+//     upload.single('img')(req, res, async (err) => {
+//         if (err instanceof multer.MulterError) {
+//             if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
+//             return res.status(400).json({ success: false, message: err.message });
+//         } else if (err) {
+//             return res.status(400).json({ success: false, message: err.message });
+//         }
 
-        const { posterName } = req.body;
+//         const { posterName } = req.body;
 
-        if (!posterName) {
-            return res.status(400).json({ success: false, message: "Name is required." });
-        }
+//         if (!posterName) {
+//             return res.status(400).json({ success: false, message: "Name is required." });
+//         }
 
-        // Upload image to Cloudinary
-        let imageUrl = 'no_url';
-        let publicId = null;
+//         // Upload image to Cloudinary
+//         let imageUrl = 'no_url';
+//         let publicId = null;
 
-        if (req.file) {
-            const result = await uploadToCloudinary(req.file.buffer, 'posters');
-            imageUrl = result.url;
-            publicId = result.publicId;
-        }
+//         if (req.file) {
+//             const result = await uploadToCloudinary(req.file.buffer, 'posters');
+//             imageUrl = result.url;
+//             publicId = result.publicId;
+//         }
 
-        const newPoster = new Poster({ posterName, imageUrl, publicId });
-        await newPoster.save();
+//         const newPoster = new Poster({ posterName, imageUrl, publicId });
+//         await newPoster.save();
 
-        res.json({ success: true, message: "Poster created successfully.", data: null });
+//         res.json({ success: true, message: "Poster created successfully.", data: null });
+//     });
+// }));
+router.post(
+  '/',
+  upload.single('img'),
+  asyncHandler(async (req, res) => {
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Image is required."
+      });
+    }
+
+    const { posterName } = req.body;
+
+    if (!posterName) {
+      return res.status(400).json({
+        success: false,
+        message: "Name is required."
+      });
+    }
+
+    let imageUrl = 'no_url';
+    let publicId = null;
+
+    const result = await uploadToCloudinary(
+      req.file.buffer,
+      'posters'
+    );
+
+    imageUrl = result.url;
+    publicId = result.publicId;
+
+    const newPoster = new Poster({
+      posterName,
+      imageUrl,
+      publicId
     });
-}));
+
+    await newPoster.save();
+
+    return res.json({
+      success: true,
+      message: "Poster created successfully.",
+      data: newPoster
+    });
+  })
+);
 
 // ─── UPDATE POSTER ────────────────────────────────────────────────────────────
-router.put('/:id', asyncHandler(async (req, res) => {
-    upload.single('img')(req, res, async (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(400).json({ success: false, message: err.message });
-        }
+// router.put('/:id', asyncHandler(async (req, res) => {
+//     upload.single('img')(req, res, async (err) => {
+//         if (err instanceof multer.MulterError) {
+//             if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
+//             return res.status(400).json({ success: false, message: err.message });
+//         } else if (err) {
+//             return res.status(400).json({ success: false, message: err.message });
+//         }
 
-        const poster = await Poster.findById(req.params.id);
-        if (!poster) {
-            return res.status(404).json({ success: false, message: "Poster not found." });
-        }
+//         const poster = await Poster.findById(req.params.id);
+//         if (!poster) {
+//             return res.status(404).json({ success: false, message: "Poster not found." });
+//         }
 
-        const { posterName } = req.body;
+//         const { posterName } = req.body;
 
-        if (!posterName) {
-            return res.status(400).json({ success: false, message: "Name is required." });
-        }
+//         if (!posterName) {
+//             return res.status(400).json({ success: false, message: "Name is required." });
+//         }
 
-        poster.posterName = posterName;
+//         poster.posterName = posterName;
 
-        // If a new image was uploaded, delete old from Cloudinary and upload new
-        if (req.file) {
-            if (poster.publicId) {
-                await cloudinary.uploader.destroy(poster.publicId).catch(e =>
-                    console.error(`Cloudinary delete failed for ${poster.publicId}:`, e.message)
-                );
-            }
+//         // If a new image was uploaded, delete old from Cloudinary and upload new
+//         if (req.file) {
+//             if (poster.publicId) {
+//                 await cloudinary.uploader.destroy(poster.publicId).catch(e =>
+//                     console.error(`Cloudinary delete failed for ${poster.publicId}:`, e.message)
+//                 );
+//             }
 
-            const result = await uploadToCloudinary(req.file.buffer, 'posters');
-            poster.imageUrl = result.url;
-            poster.publicId = result.publicId;
-        }
+//             const result = await uploadToCloudinary(req.file.buffer, 'posters');
+//             poster.imageUrl = result.url;
+//             poster.publicId = result.publicId;
+//         }
 
-        await poster.save();
-        res.json({ success: true, message: "Poster updated successfully.", data: null });
+//         await poster.save();
+//         res.json({ success: true, message: "Poster updated successfully.", data: null });
+//     });
+// }));
+
+router.put(
+  '/:id',
+  upload.single('img'),
+  asyncHandler(async (req, res) => {
+
+    const poster = await Poster.findById(req.params.id);
+
+    if (!poster) {
+      return res.status(404).json({
+        success: false,
+        message: "Poster not found."
+      });
+    }
+
+    const { posterName } = req.body;
+
+    if (!posterName) {
+      return res.status(400).json({
+        success: false,
+        message: "Name is required."
+      });
+    }
+
+    poster.posterName = posterName;
+
+    if (req.file) {
+
+      // delete old image
+      if (poster.publicId) {
+        await cloudinary.uploader.destroy(poster.publicId).catch(err => {
+          console.error("Cloudinary delete error:", err.message);
+        });
+      }
+
+      // upload new image
+      const result = await uploadToCloudinary(
+        req.file.buffer,
+        'posters'
+      );
+
+      poster.imageUrl = result.url;
+      poster.publicId = result.publicId;
+    }
+
+    await poster.save();
+
+    return res.json({
+      success: true,
+      message: "Poster updated successfully.",
+      data: poster
     });
-}));
+  })
+);
 
 // ─── DELETE POSTER ────────────────────────────────────────────────────────────
 router.delete('/:id', asyncHandler(async (req, res) => {
