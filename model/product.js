@@ -48,6 +48,10 @@ const productSchema = new mongoose.Schema({
         url: {
             type: String,
             required: true
+        },
+        publicId: {         // ← only addition for Cloudinary
+            type: String,
+            required: true
         }
     }]
 }, { timestamps: true });

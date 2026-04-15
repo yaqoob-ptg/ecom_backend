@@ -9,7 +9,10 @@ const posterSchema = new mongoose.Schema({
   imageUrl: {
     type: String,
     required: true
-  }
+  }, 
+  publicId: {          // ← added for Cloudinary deletion
+        type: String,
+    }
 }, {
   timestamps: true 
 });
