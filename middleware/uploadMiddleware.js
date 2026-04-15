@@ -26,6 +26,8 @@ const cloudinary = require('../config/cloudinary');
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
+     console.log("UPLOAD MIME TYPE:", file.mimetype);
+    console.log("UPLOAD ORIGINAL NAME:", file.originalname);
     const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (allowed.includes(file.mimetype)) {
         cb(null, true);
