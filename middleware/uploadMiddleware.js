@@ -21,15 +21,30 @@
 
 const multer  = require('multer');
 const cloudinary = require('../config/cloudinary');
+const path = require('path');
 
 // Use memory storage — no disk writes, buffer goes straight to Cloudinary
 const storage = multer.memoryStorage();
 
+// const fileFilter = (req, file, cb) => {
+//      console.log("UPLOAD MIME TYPE:", file.mimetype);
+//     console.log("UPLOAD ORIGINAL NAME:", file.originalname);
+//     const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+//     if (allowed.includes(file.mimetype)) {
+//         cb(null, true);
+//     } else {
+//         cb(new Error('Only JPG, PNG, and WEBP images are allowed'), false);
+//     }
+// };
+
+
 const fileFilter = (req, file, cb) => {
-     console.log("UPLOAD MIME TYPE:", file.mimetype);
-    console.log("UPLOAD ORIGINAL NAME:", file.originalname);
-    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (allowed.includes(file.mimetype)) {
+    const allowedMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExt = ['.jpg', '.jpeg', '.png', '.webp'];
+
+    if (allowedMime.includes(file.mimetype) || allowedExt.includes(ext)) {
         cb(null, true);
     } else {
         cb(new Error('Only JPG, PNG, and WEBP images are allowed'), false);
