@@ -181,166 +181,166 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 // ─── CREATE CATEGORY ──────────────────────────────────────────────────────────
-// router.post('/', asyncHandler(async (req, res) => {
-//     upload.single('img')(req, res, async (err) => {
-//         if (err instanceof multer.MulterError) {
-//             if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
-//             return res.status(400).json({ success: false, message: err.message });
-//         } else if (err) {
-//             return res.status(400).json({ success: false, message: err.message });
-//         }
+router.post('/', asyncHandler(async (req, res) => {
+    upload.single('img')(req, res, async (err) => {
+        if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
+            return res.status(400).json({ success: false, message: err.message });
+        } else if (err) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
 
-//         const { name } = req.body;
+        const { name } = req.body;
 
-//         if (!name) {
-//             return res.status(400).json({ success: false, message: "Name is required." });
-//         }
+        if (!name) {
+            return res.status(400).json({ success: false, message: "Name is required." });
+        }
 
-//         // Upload image to Cloudinary
-//         let image    = 'no_url';
-//         let publicId = null;
+        // Upload image to Cloudinary
+        let image    = 'no_url';
+        let publicId = null;
 
-//         if (req.file) {
-//             const result = await uploadToCloudinary(req.file.buffer, 'categories');
-//             image    = result.url;
-//             publicId = result.publicId;
-//         }
+        if (req.file) {
+            const result = await uploadToCloudinary(req.file.buffer, 'categories');
+            image    = result.url;
+            publicId = result.publicId;
+        }
 
-//         const newCategory = new Category({ name, image, publicId });
-//         await newCategory.save();
+        const newCategory = new Category({ name, image, publicId });
+        await newCategory.save();
 
-//         res.json({ success: true, message: "Category created successfully.", data: null });
+        res.json({ success: true, message: "Category created successfully.", data: null });
+    });
+}));
+// router.post(
+//   '/',
+//   upload.single('img'),
+//   asyncHandler(async (req, res) => {
+
+//     const { name } = req.body;
+
+//     if (!name) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Name is required."
+//       });
+//     }
+
+//     let image = 'no_url';
+//     let publicId = null;
+
+//     if (req.file) {
+//       const result = await uploadToCloudinary(
+//         req.file.buffer,
+//         'categories'
+//       );
+
+//       image = result.url;
+//       publicId = result.publicId;
+//     }
+
+//     const newCategory = new Category({
+//       name,
+//       image,
+//       publicId
 //     });
-// }));
-router.post(
-  '/',
-  upload.single('img'),
-  asyncHandler(async (req, res) => {
 
-    const { name } = req.body;
+//     await newCategory.save();
 
-    if (!name) {
-      return res.status(400).json({
-        success: false,
-        message: "Name is required."
-      });
-    }
-
-    let image = 'no_url';
-    let publicId = null;
-
-    if (req.file) {
-      const result = await uploadToCloudinary(
-        req.file.buffer,
-        'categories'
-      );
-
-      image = result.url;
-      publicId = result.publicId;
-    }
-
-    const newCategory = new Category({
-      name,
-      image,
-      publicId
-    });
-
-    await newCategory.save();
-
-    res.json({
-      success: true,
-      message: "Category created successfully."
-    });
-  })
-);
+//     res.json({
+//       success: true,
+//       message: "Category created successfully."
+//     });
+//   })
+// );
 
 // ─── UPDATE CATEGORY ──────────────────────────────────────────────────────────
-// router.put('/:id', asyncHandler(async (req, res) => {
-//     upload.single('img')(req, res, async (err) => {
-//         if (err instanceof multer.MulterError) {
-//             if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
-//             return res.status(400).json({ success: false, message: err.message });
-//         } else if (err) {
-//             return res.status(400).json({ success: false, message: err.message });
-//         }
+router.put('/:id', asyncHandler(async (req, res) => {
+    upload.single('img')(req, res, async (err) => {
+        if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
+            return res.status(400).json({ success: false, message: err.message });
+        } else if (err) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
 
-//         const category = await Category.findById(req.params.id);
-//         if (!category) {
-//             return res.status(404).json({ success: false, message: "Category not found." });
-//         }
+        const category = await Category.findById(req.params.id);
+        if (!category) {
+            return res.status(404).json({ success: false, message: "Category not found." });
+        }
 
-//         const { name } = req.body;
+        const { name } = req.body;
 
-//         if (!name) {
-//             return res.status(400).json({ success: false, message: "Name is required." });
-//         }
+        if (!name) {
+            return res.status(400).json({ success: false, message: "Name is required." });
+        }
 
-//         category.name = name;
+        category.name = name;
 
-//         // If a new image was uploaded, delete old from Cloudinary and upload new
-//         if (req.file) {
-//             if (category.publicId) {
-//                 await cloudinary.uploader.destroy(category.publicId).catch(e =>
-//                     console.error(`Cloudinary delete failed for ${category.publicId}:`, e.message)
-//                 );
-//             }
+        // If a new image was uploaded, delete old from Cloudinary and upload new
+        if (req.file) {
+            if (category.publicId) {
+                await cloudinary.uploader.destroy(category.publicId).catch(e =>
+                    console.error(`Cloudinary delete failed for ${category.publicId}:`, e.message)
+                );
+            }
 
-//             const result = await uploadToCloudinary(req.file.buffer, 'categories');
-//             category.image    = result.url;
-//             category.publicId = result.publicId;
-//         }
+            const result = await uploadToCloudinary(req.file.buffer, 'categories');
+            category.image    = result.url;
+            category.publicId = result.publicId;
+        }
 
-//         await category.save();
-//         res.json({ success: true, message: "Category updated successfully.", data: null });
-//     });
-// }));
-router.put(
-  '/:id',
-  upload.single('img'),
-  asyncHandler(async (req, res) => {
-
-    const category = await Category.findById(req.params.id);
-
-    if (!category) {
-      return res.status(404).json({
-        success: false,
-        message: "Category not found."
-      });
-    }
-
-    const { name } = req.body;
-
-    if (!name) {
-      return res.status(400).json({
-        success: false,
-        message: "Name is required."
-      });
-    }
-
-    category.name = name;
-
-    if (req.file) {
-      if (category.publicId) {
-        await cloudinary.uploader.destroy(category.publicId);
-      }
-
-      const result = await uploadToCloudinary(
-        req.file.buffer,
-        'categories'
-      );
-
-      category.image = result.url;
-      category.publicId = result.publicId;
-    }
-
-    await category.save();
-
-    res.json({
-      success: true,
-      message: "Category updated successfully."
+        await category.save();
+        res.json({ success: true, message: "Category updated successfully.", data: null });
     });
-  })
-);
+}));
+// router.put(
+//   '/:id',
+//   upload.single('img'),
+//   asyncHandler(async (req, res) => {
+
+//     const category = await Category.findById(req.params.id);
+
+//     if (!category) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Category not found."
+//       });
+//     }
+
+//     const { name } = req.body;
+
+//     if (!name) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Name is required."
+//       });
+//     }
+
+//     category.name = name;
+
+//     if (req.file) {
+//       if (category.publicId) {
+//         await cloudinary.uploader.destroy(category.publicId);
+//       }
+
+//       const result = await uploadToCloudinary(
+//         req.file.buffer,
+//         'categories'
+//       );
+
+//       category.image = result.url;
+//       category.publicId = result.publicId;
+//     }
+
+//     await category.save();
+
+//     res.json({
+//       success: true,
+//       message: "Category updated successfully."
+//     });
+//   })
+// );
 
 // ─── DELETE CATEGORY ──────────────────────────────────────────────────────────
 router.delete('/:id', asyncHandler(async (req, res) => {
