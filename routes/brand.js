@@ -3,11 +3,19 @@ const router = express.Router();
 const Brand = require('../model/brand');
 const Product = require('../model/product');
 const asyncHandler = require('express-async-handler');
+const auth = require('../middleware/auth');
+
+// Apply authentication middleware to all routes
+router.use(auth);
 
 // Get all brands
 router.get('/', asyncHandler(async (req, res) => {
     try {
-        const brands = await Brand.find().populate('subcategoryId').sort({'subcategoryId': 1});
+        let fileter = {};
+        if(req.user.role ==='admin'){
+            fileter.adminId = req.user._id;
+        }
+        const brands = await Brand.find(fileter).populate('subcategoryId').sort({'subcategoryId': 1});
         res.json({ success: true, message: "Brands retrieved successfully.", data: brands });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -36,7 +44,7 @@ router.post('/', asyncHandler(async (req, res) => {
     }
 
     try {
-        const brand = new Brand({ name, subcategoryId });
+        const brand = new Brand({adminId: req.user._id, name, subcategoryId });
         const newBrand = await brand.save();
         res.json({ success: true, message: "Brand created successfully.", data: null });
     } catch (error) {

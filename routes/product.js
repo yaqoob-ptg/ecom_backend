@@ -196,13 +196,20 @@ const Product    = require('../model/product');
 const cloudinary = require('../config/cloudinary');
 const { upload, uploadToCloudinary } = require('../middleware/uploadMiddleware');
 const asyncHandler = require('express-async-handler');
+const auth = require('../middleware/auth');
 
 const IMAGE_FIELDS = ['image1', 'image2', 'image3', 'image4', 'image5'];
 const multerFields = IMAGE_FIELDS.map(f => ({ name: f, maxCount: 1 }));
 
 // ─── GET ALL ─────────────────────────────────────────────────────────────────
-router.get('/', asyncHandler(async (req, res) => {
-    const products = await Product.find()
+router.get('/',auth, asyncHandler(async (req, res) => {
+        let filter = {};
+
+    // 👇 if admin → only their products
+    if (req.user.role === 'admin') {
+        filter.adminId = req.user._id;
+    }
+    const products = await Product.find(filter)
         .populate('proCategoryId',    'id name')
         .populate('proSubCategoryId', 'id name')
         .populate('proBrandId',       'id name')
@@ -228,16 +235,17 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 // ─── CREATE ──────────────────────────────────────────────────────────────────
-router.post('/', asyncHandler(async (req, res) => {
+router.post('/', auth, asyncHandler(async (req, res) => {
     upload.fields(multerFields)(req, res, async (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size too large. Max 5MB per image.';
             return res.status(400).json({ success: false, message: err.message });
         } else if (err) {
-            return res.status(400).json({ success: false, message: err.message });
+            return res.status(500).json({ success: false, message: err.message });
         }
 
-        const { name, description, quantity, price, offerPrice,
+        const {    
+              name, description, quantity, price, offerPrice,
                 proCategoryId, proSubCategoryId, proBrandId,
                 proVariantTypeId, proVariantId } = req.body;
 
@@ -259,6 +267,7 @@ router.post('/', asyncHandler(async (req, res) => {
         }
 
         const newProduct = new Product({
+            adminId: req.user._id,
             name, description, quantity, price, offerPrice,
             proCategoryId, proSubCategoryId, proBrandId,
             proVariantTypeId, proVariantId,

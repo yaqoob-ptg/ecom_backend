@@ -1,7 +1,12 @@
 const mongoose = require('mongoose');
 
 // Define the SubCategory schema
-const subCategorySchema = new mongoose.Schema({
+const subCategorySchema = new mongoose.Schema({    adminId:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User', // This should match the model name you use when you create the User model
+        required: [true, 'Admin ID is required']
+    },
+
     name: {
         type: String,
         required: [true, 'Name is required'], // Adding custom error message

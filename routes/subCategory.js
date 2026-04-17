@@ -4,11 +4,15 @@ const SubCategory = require('../model/subCategory');
 const Brand = require('../model/brand');
 const Product = require('../model/product');
 const asyncHandler = require('express-async-handler');
-
+const auth = require('../middleware/auth');
 // Get all sub-categories
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/',auth, asyncHandler(async (req, res) => {
     try {
-        const subCategories = await SubCategory.find().populate('categoryId').sort({'categoryId': 1});
+        let filters={};
+        if(req.user.role=='admin'){
+            filters.adminId=req.user._id;
+        }
+        const subCategories = await SubCategory.find(filters).populate('categoryId').sort({'categoryId': 1});
         res.json({ success: true, message: "Sub-categories retrieved successfully.", data: subCategories });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -16,9 +20,14 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 // Get a sub-category by ID
-router.get('/:id', asyncHandler(async (req, res) => {
+router.get('/:id',auth, asyncHandler(async (req, res) => {
     try {
         const subCategoryID = req.params.id;
+        // let filters={};
+        // if(req.user.role=='admin'){
+        //     filters.adminId=req.user._id;
+        // }
+
         const subCategory = await SubCategory.findById(subCategoryID).populate('categoryId');
         if (!subCategory) {
             return res.status(404).json({ success: false, message: "Sub-category not found." });
@@ -30,14 +39,15 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 // Create a new sub-category
-router.post('/', asyncHandler(async (req, res) => {
+router.post('/',auth, asyncHandler(async (req, res) => {
     const { name, categoryId } = req.body;
     if (!name || !categoryId) {
         return res.status(400).json({ success: false, message: "Name and category ID are required." });
     }
 
     try {
-        const subCategory = new SubCategory({ name, categoryId });
+
+        const subCategory = new SubCategory({adminId: req.user._id, name, categoryId });
         const newSubCategory = await subCategory.save();
         res.json({ success: true, message: "Sub-category created successfully.", data: null });
     } catch (error) {
@@ -46,7 +56,7 @@ router.post('/', asyncHandler(async (req, res) => {
 }));
 
 // Update a sub-category
-router.put('/:id', asyncHandler(async (req, res) => {
+router.put('/:id',auth, asyncHandler(async (req, res) => {
     const subCategoryID = req.params.id;
     const { name, categoryId } = req.body;
     console.log(req.body)
@@ -67,7 +77,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
 }));
 
 // Delete a sub-category
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete('/:id',auth, asyncHandler(async (req, res) => {
     const subCategoryID = req.params.id;
     try {
         // Check if any brand is associated with the sub-category

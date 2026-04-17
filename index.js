@@ -81,6 +81,7 @@ app.use(bodyParser.json());
 // app.use('/image/poster', express.static(path.join(__dirname, 'public/posters')));
 
 const URL = process.env.MONGO_URL;
+
 // mongoose.connect(URL);
 // const db = mongoose.connection;
 // db.on('error', (error) => console.error(error));
@@ -158,16 +159,18 @@ app.use((error, req, res, next) => {
     res.status(500).json({ success: false, message: error.message, data: null });
 });
 
-// const PORT = process.env.PORT || 3000; 
 
-// app.listen(PORT, () => {
-//     console.log(`Local host running on http://localhost:${process.env.PORT}`);
-//     // ngrok.connect(PORT).then(ngrokUrl=>{
-//     //     console.log(`Ngrok URL: ${ngrokUrl}`);
-//     // }).catch(error=>{
-//     //     console.error('Error connecting to ngrok:', error);
-//     // })
-// });
+//for running localhost
+const PORT = process.env.PORT || 3000; 
+
+app.listen(PORT, () => {
+    console.log(`Local host running on http://localhost:${process.env.PORT}`);
+    // ngrok.connect(PORT).then(ngrokUrl=>{
+    //     console.log(`Ngrok URL: ${ngrokUrl}`);
+    // }).catch(error=>{
+    //     console.error('Error connecting to ngrok:', error);
+    // })
+});
 
 //do not use app.listen when deploying to vercel, vercel will handle the server for you
 module.exports = app;

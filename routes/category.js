@@ -164,10 +164,18 @@ const Product      = require('../model/product');
 const cloudinary   = require('../config/cloudinary');
 const { upload, uploadToCloudinary } = require('../middleware/uploadMiddleware');
 const asyncHandler = require('express-async-handler');
+const auth = require('../middleware/auth');
 
 // ─── GET ALL CATEGORIES ───────────────────────────────────────────────────────
-router.get('/', asyncHandler(async (req, res) => {
-    const categories = await Category.find();
+router.get('/', auth, asyncHandler(async (req, res) => {
+    let filters={};
+    if(req.user.role=='admin'){
+        filters.adminId=req.user._id;
+    }
+
+    const categories = await Category.find(filters);
+
+
     res.json({ success: true, message: "Categories retrieved successfully.", data: categories });
 }));
 
@@ -179,15 +187,15 @@ router.get('/:id', asyncHandler(async (req, res) => {
     }
     res.json({ success: true, message: "Category retrieved successfully.", data: category });
 }));
-
+ 
 // ─── CREATE CATEGORY ──────────────────────────────────────────────────────────
-router.post('/', asyncHandler(async (req, res) => {
+router.post('/', auth, asyncHandler(async (req, res) => {
     upload.single('img')(req, res, async (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
             return res.status(400).json({ success: false, message: err.message });
         } else if (err) {
-            return res.status(400).json({ success: false, message: err.message });
+            return res.status(500).json({ success: false, message: err.message });
         }
 
         const { name } = req.body;
@@ -201,12 +209,13 @@ router.post('/', asyncHandler(async (req, res) => {
         let publicId = null;
 
         if (req.file) {
+
             const result = await uploadToCloudinary(req.file.buffer, 'categories');
             image    = result.url;
             publicId = result.publicId;
         }
 
-        const newCategory = new Category({ name, image, publicId });
+        const newCategory = new Category({adminId: req.user._id,  name, image, publicId });
         await newCategory.save();
 
         res.json({ success: true, message: "Category created successfully.", data: null });

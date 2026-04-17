@@ -1,7 +1,12 @@
 const mongoose = require('mongoose');
 
 // Define the Notification schema
-const notificationSchema = new mongoose.Schema({
+const notificationSchema = new mongoose.Schema({    adminId:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User', // This should match the model name you use when you create the User model
+        required: [true, 'Admin ID is required']
+    },
+
     notificationId: {
         type: String,
         required: [true, 'Notification ID is required'],

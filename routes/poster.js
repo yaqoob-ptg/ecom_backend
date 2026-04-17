@@ -92,7 +92,6 @@
 //             const { posterName } = req.body;
 //             let image = req.body.image;
 
-
 //             if (req.file) {
 //                 image = `/image/poster/${req.file.filename}`;
 //             }
@@ -135,63 +134,115 @@
 
 // module.exports = router;
 
-
 //? Refactored poster routes to use Cloudinary for image storage instead of local disk storage
-const express    = require('express');
-const router     = express.Router();
-const multer     = require('multer');
-const Poster     = require('../model/poster');
-const cloudinary = require('../config/cloudinary');
-const { upload, uploadToCloudinary } = require('../middleware/uploadMiddleware');
-const asyncHandler = require('express-async-handler');
+const express = require("express");
+const router = express.Router();
+const multer = require("multer");
+const Poster = require("../model/poster");
+const cloudinary = require("../config/cloudinary");
+const {
+  upload,
+  uploadToCloudinary,
+} = require("../middleware/uploadMiddleware");
+const asyncHandler = require("express-async-handler");
+const auth = require("../middleware/auth");
+
+// All routes require authentication
+router.use(auth);
 
 // ─── GET ALL POSTERS ──────────────────────────────────────────────────────────
-router.get('/', asyncHandler(async (req, res) => {
-    const posters = await Poster.find({});
-    res.json({ success: true, message: "Posters retrieved successfully.", data: posters });
-}));
+router.get(
+  "/",
+  asyncHandler(async (req, res) => {
+    let filter = {};
+    if (req.user.role === "admin") {
+      filter.adminId = req.user._id; // Regular users see only their posters
+    }
+    const posters = await Poster.find(filter);
+    res.json({
+      success: true,
+      message: "Posters retrieved successfully.",
+      data: posters,
+    });
+  }),
+);
 
 // ─── GET POSTER BY ID ─────────────────────────────────────────────────────────
-router.get('/:id', asyncHandler(async (req, res) => {
-    const poster = await Poster.findById(req.params.id);
+router.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    // const poster = await Poster.findById(req.params.id);
+    const poster = await Poster.findOne({
+      _id: req.params.id,
+      adminId: req.user._id,
+    });
     if (!poster) {
-        return res.status(404).json({ success: false, message: "Poster not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Poster not found." });
     }
-    res.json({ success: true, message: "Poster retrieved successfully.", data: poster });
-}));
+    res.json({
+      success: true,
+      message: "Poster retrieved successfully.",
+      data: poster,
+    });
+  }),
+);
 
 // ─── CREATE POSTER ────────────────────────────────────────────────────────────
-router.post('/', asyncHandler(async (req, res) => {
-    upload.single('img')(req, res, async (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(400).json({ success: false, message: err.message });
-        }
-
-        const { posterName } = req.body;
-
-        if (!posterName) {
-            return res.status(400).json({ success: false, message: "Name is required." });
-        }
-
-        // Upload image to Cloudinary
-        let imageUrl = 'no_url';
-        let publicId = null;
-
-        if (req.file) {
-            const result = await uploadToCloudinary(req.file.buffer, 'posters');
-            imageUrl = result.url;
-            publicId = result.publicId;
-        }
-
-        const newPoster = new Poster({ posterName, imageUrl, publicId });
-        await newPoster.save();
-
-        res.json({ success: true, message: "Poster created successfully.", data: null });
+router.post(
+  "/",
+  asyncHandler(async (req, res) => {
+    if (req.user.role !== 'admin') {
+    return res.status(403).json({
+        success: false,
+        message: "Only admin can create posters"
     });
-}));
+}
+    upload.single("img")(req, res, async (err) => {
+    
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE")
+          err.message = "File size is too large. Maximum filesize is 5MB.";
+        return res.status(400).json({ success: false, message: err.message });
+      } else if (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+
+      const { posterName } = req.body;
+
+      if (!posterName) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Name is required." });
+      }
+
+      // Upload image to Cloudinary
+      let imageUrl = "no_url";
+      let publicId = null;
+
+      if (req.file) {
+        const result = await uploadToCloudinary(req.file.buffer, "posters");
+        imageUrl = result.url;
+        publicId = result.publicId;
+      }
+
+      const newPoster = new Poster({
+        adminId: req.user._id,
+        posterName,
+        imageUrl,
+        publicId,
+      });
+      await newPoster.save();
+
+      res.json({
+        success: true,
+        message: "Poster created successfully.",
+        data: null,
+      });
+    });
+  }),
+);
 // router.post(
 //   '/',
 //   upload.single('img'),
@@ -241,45 +292,66 @@ router.post('/', asyncHandler(async (req, res) => {
 // );
 
 // ─── UPDATE POSTER ────────────────────────────────────────────────────────────
-router.put('/:id', asyncHandler(async (req, res) => {
-    upload.single('img')(req, res, async (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(400).json({ success: false, message: err.message });
+router.put(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    upload.single("img")(req, res, async (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE")
+          err.message = "File size is too large. Maximum filesize is 5MB.";
+        return res.status(400).json({ success: false, message: err.message });
+      } else if (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+
+    //   const poster = await Poster.findById(req.params.id);
+    const poster = await Poster.findOne({
+    _id: req.params.id,
+    adminId: req.user._id
+});
+      if (!poster) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Poster not found." });
+      }
+
+      const { posterName } = req.body;
+
+      if (!posterName) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Name is required." });
+      }
+
+      poster.posterName = posterName;
+
+      // If a new image was uploaded, delete old from Cloudinary and upload new
+      if (req.file) {
+        if (poster.publicId) {
+          await cloudinary.uploader
+            .destroy(poster.publicId)
+            .catch((e) =>
+              console.error(
+                `Cloudinary delete failed for ${poster.publicId}:`,
+                e.message,
+              ),
+            );
         }
 
-        const poster = await Poster.findById(req.params.id);
-        if (!poster) {
-            return res.status(404).json({ success: false, message: "Poster not found." });
-        }
+        const result = await uploadToCloudinary(req.file.buffer, "posters");
+        poster.imageUrl = result.url;
+        poster.publicId = result.publicId;
+      }
 
-        const { posterName } = req.body;
-
-        if (!posterName) {
-            return res.status(400).json({ success: false, message: "Name is required." });
-        }
-
-        poster.posterName = posterName;
-
-        // If a new image was uploaded, delete old from Cloudinary and upload new
-        if (req.file) {
-            if (poster.publicId) {
-                await cloudinary.uploader.destroy(poster.publicId).catch(e =>
-                    console.error(`Cloudinary delete failed for ${poster.publicId}:`, e.message)
-                );
-            }
-
-            const result = await uploadToCloudinary(req.file.buffer, 'posters');
-            poster.imageUrl = result.url;
-            poster.publicId = result.publicId;
-        }
-
-        await poster.save();
-        res.json({ success: true, message: "Poster updated successfully.", data: null });
+      await poster.save();
+      res.json({
+        success: true,
+        message: "Poster updated successfully.",
+        data: null,
+      });
     });
-}));
+  }),
+);
 
 // router.put(
 //   '/:id',
@@ -336,21 +408,39 @@ router.put('/:id', asyncHandler(async (req, res) => {
 // );
 
 // ─── DELETE POSTER ────────────────────────────────────────────────────────────
-router.delete('/:id', asyncHandler(async (req, res) => {
-    const poster = await Poster.findById(req.params.id);
+router.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    // const poster = await Poster.findById(req.params.id);
+    const poster = await Poster.findOne({
+    _id: req.params.id,
+    adminId: req.user._id
+});
     if (!poster) {
-        return res.status(404).json({ success: false, message: "Poster not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Poster not found." });
     }
 
     // Delete image from Cloudinary
     if (poster.publicId) {
-        await cloudinary.uploader.destroy(poster.publicId).catch(e =>
-            console.error(`Cloudinary delete failed for ${poster.publicId}:`, e.message)
+      await cloudinary.uploader
+        .destroy(poster.publicId)
+        .catch((e) =>
+          console.error(
+            `Cloudinary delete failed for ${poster.publicId}:`,
+            e.message,
+          ),
         );
     }
 
     await poster.deleteOne();
-    res.json({ success: true, message: "Poster deleted successfully.", data: null });
-}));
+    res.json({
+      success: true,
+      message: "Poster deleted successfully.",
+      data: null,
+    });
+  }),
+);
 
 module.exports = router;
