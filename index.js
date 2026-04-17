@@ -161,7 +161,7 @@ app.use((error, req, res, next) => {
 
 
 //for running localhost
-// const PORT = process.env.PORT || 3000; 
+const PORT = process.env.PORT || 3000; 
 
 // app.listen(PORT, () => {
 //     console.log(`Local host running on http://localhost:${process.env.PORT}`);

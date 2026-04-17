@@ -145,15 +145,20 @@ const sendVerificationEmail = async (email, token) => {
 router.post(
   "/register",
   asyncHandler(async (req, res) => {
-    const { name, email, phone, password, role } = req.body;
+    const { name, email, phone, password, role, location } = req.body;
 
-    if (!name || !email || !phone || !password) {
+    if (!name || !email || !phone || !password || !location) {
       return res.status(400).json({
         success: false,
-        message: "Name, email, phone, and password are required.",
+        message: "Name, email, phone, location, and password are required.",
       });
     }
-
+if (!location || location.trim() === "") {
+  return res.status(400).json({
+    success: false,
+    message: "Location is required",
+  });
+}
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res
@@ -162,13 +167,18 @@ router.post(
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
 
     const user = new User({
       name,
       email,
       phone,
+      location,
       password: hashedPassword,
       role: role || "user",
+      verificationToken,
+      verificationTokenExpires,
     });
 
     await user.save();
@@ -212,12 +222,10 @@ router.post(
         .json({ success: false, message: "Invalid email or password." });
     }
     if (requiredRole == "admin" && user.role !== "admin") {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Access Denied: You do not have administrative privileges.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Access Denied: You do not have administrative privileges.",
+      });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -266,33 +274,34 @@ router.post(
     });
   }),
 );
-router.post('/refresh-token', asyncHandler(async (req, res) => {
+router.post(
+  "/refresh-token",
+  asyncHandler(async (req, res) => {
+    const { refreshToken } = req.body;
 
-  const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(401).json({ message: "No refresh token" });
+    }
 
-  if (!refreshToken) {
-    return res.status(401).json({ message: "No refresh token" });
-  }
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
 
-  const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded._id);
 
-  const user = await User.findById(decoded._id);
+    if (!user || user.refreshToken !== refreshToken) {
+      return res.status(403).json({ message: "Invalid refresh token" });
+    }
 
-  if (!user || user.refreshToken !== refreshToken) {
-    return res.status(403).json({ message: "Invalid refresh token" });
-  }
+    const newAccessToken = jwt.sign(
+      { _id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" },
+    );
 
-  const newAccessToken = jwt.sign(
-    { _id: user._id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: '15m' }
-  );
-
-  res.json({
-    accessToken: newAccessToken
-  });
-
-}));
+    res.json({
+      accessToken: newAccessToken,
+    });
+  }),
+);
 
 // ─── Guest Login ───────────────────────────────────────────────────────────────
 router.post(
@@ -452,17 +461,18 @@ router.get(
   }),
 );
 
-router.post('/logout', asyncHandler(async (req, res) => {
+router.post(
+  "/logout",
+  asyncHandler(async (req, res) => {
+    const { userId } = req.body;
 
-  const { userId } = req.body;
+    await User.findByIdAndUpdate(userId, {
+      refreshToken: null,
+    });
 
-  await User.findByIdAndUpdate(userId, {
-    refreshToken: null
-  });
-
-  res.json({ message: "Logged out successfully" });
-
-}));
+    res.json({ message: "Logged out successfully" });
+  }),
+);
 
 // ─── Update User ───────────────────────────────────────────────────────────────
 router.put(

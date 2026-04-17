@@ -23,64 +23,76 @@
 
 // module.exports = User;
 
-
-const mongoose = require('mongoose');
-const crypto = require('crypto');
+const mongoose = require("mongoose");
+const crypto = require("crypto");
 
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true
+    required: true,
   },
   email: {
     type: String,
     required: true,
     unique: true,
     lowercase: true,
-    trim: true
+    trim: true,
   },
   phone: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+  },
+  location: {
+    type: String,
+    required: true,
+    trim: true,
   },
   password: {
     type: String,
-    required: true
+    required: true,
   },
   refreshToken: {
-  type: String,
-  default: null
-},
+    type: String,
+    default: null,
+  },
   role: {
     type: String,
-    enum: ['user', 'admin', 'moderator', 'guest'],
-    default: 'user'
+    enum: ["user", "admin", "moderator", "guest"],
+    default: "user",
   },
   isVerified: {
     type: Boolean,
-    default: false
+    default: false,
   },
+  // verificationToken: {
+  //   type: String,
+  //   default: () => crypto.randomBytes(32).toString("hex"),
+  // },
+  // verificationTokenExpires: {
+  //   type: Date,
+  //   default: () => Date.now() + 24 * 60 * 60 * 1000,
+  // },
   verificationToken: {
-    type: String,
-    default: () => crypto.randomBytes(32).toString('hex')
-  },
-  verificationTokenExpires: {
-    type: Date,
-    default: () => Date.now() + 24 * 60 * 60 * 1000
-  },
+  type: String,
+  default: null,
+},
+verificationTokenExpires: {
+  type: Date,
+  default: null,
+},
   guestExpiresAt: {
     type: Date,
-    default: null
+    default: null,
   },
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
 });
 
 userSchema.index(
   { guestExpiresAt: 1 },
-  { expireAfterSeconds: 0, partialFilterExpression: { role: 'guest' } }
+  { expireAfterSeconds: 0, partialFilterExpression: { role: "guest" } },
 );
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model("User", userSchema);
 module.exports = User;
