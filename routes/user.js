@@ -153,12 +153,12 @@ router.post(
         message: "Name, email, phone, location, and password are required.",
       });
     }
-if (!location || location.trim() === "") {
-  return res.status(400).json({
-    success: false,
-    message: "Location is required",
-  });
-}
+    if (!location || location.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Location is required",
+      });
+    }
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res
@@ -257,7 +257,10 @@ router.post(
 
     // ─── SAVE REFRESH TOKEN IN DB ───────────────────
     user.refreshToken = refreshToken;
-    await user.save();
+    // await user.save(); //this can cause issue if admin is created previously and also with user
+    await User.findByIdAndUpdate(user._id, {
+      refreshToken: refreshToken,
+    });
     const {
       password: _,
       verificationToken: __,
