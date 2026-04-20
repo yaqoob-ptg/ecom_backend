@@ -113,7 +113,7 @@ const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const User = require("../model/user");
 const jwt = require("jsonwebtoken");
-const crypto = require("crypto"); 
+const crypto = require("crypto");
 
 // ─── Email Transporter ─────────────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
@@ -189,7 +189,9 @@ router.get(
       </head>
       <body>
         <div class="card">
-          ${isValid ? `
+          ${
+            isValid
+              ? `
             <h1>Reset Your Password</h1>
             <form id="resetForm">
               <input type="password" id="password" placeholder="New Password" required minlength="6">
@@ -236,13 +238,15 @@ router.get(
                 }
               });
             </script>
-          ` : `
+          `
+              : `
             <h1 class="error">Invalid or Expired Link</h1>
             <p>The password reset link is invalid or has expired.</p>
             <a href="http://yourfrontend.com/forgot-password" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
               Request New Reset Link
             </a>
-          `}
+          `
+          }
         </div>
       </body>
     </html>
@@ -432,14 +436,14 @@ router.post(
       });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("_id isVerified email");
 
     // For security, always return success even if user doesn't exist
-    // This prevents email enumeration attacks
     if (!user) {
       return res.status(200).json({
         success: true,
-        message: "If an account exists with that email, you will receive a password reset link.",
+        message:
+          "If an account exists with that email, you will receive a password reset link.",
       });
     }
 
@@ -447,7 +451,8 @@ router.post(
     if (!user.isVerified) {
       return res.status(403).json({
         success: false,
-        message: "Please verify your email address before requesting a password reset.",
+        message:
+          "Please verify your email address before requesting a password reset.",
       });
     }
 
@@ -455,32 +460,49 @@ router.post(
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetTokenExpires = Date.now() + 60 * 60 * 1000; // 1 hour
 
-    // Save reset token to user
-    user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = resetTokenExpires;
-    await user.save();
-
     try {
+      // ✅ Update only the reset token fields
+      const result = await User.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            resetPasswordToken: resetToken,
+            resetPasswordExpires: resetTokenExpires,
+          },
+        },
+      );
+
+      if (result.modifiedCount === 0) {
+        throw new Error("Failed to update user");
+      }
+
       await sendPasswordResetEmail(user.email, resetToken);
-      
+
       res.status(200).json({
         success: true,
         message: "Password reset link has been sent to your email address.",
       });
-    } catch (emailError) {
-      // Clear reset token if email fails
-      user.resetPasswordToken = undefined;
-      user.resetPasswordExpires = undefined;
-      await user.save();
-      
+    } catch (error) {
+      // ✅ Clean up if anything fails
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $unset: {
+            resetPasswordToken: "",
+            resetPasswordExpires: "",
+          },
+        },
+      );
+
+      console.error("Forgot password error:", error);
+
       return res.status(500).json({
         success: false,
-        message: "Failed to send password reset email. Please try again later.",
+        message: "Failed to process request. Please try again later.",
       });
     }
   }),
 );
-
 // ─── Reset Password - Verify Token and Reset ──────────────────────────────────
 router.post(
   "/reset-password/:token",
@@ -518,23 +540,46 @@ router.post(
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: "Password reset token is invalid or has expired. Please request a new one.",
+        message:
+          "Password reset token is invalid or has expired. Please request a new one.",
       });
     }
 
     // Hash new password
     const hashedPassword = await bcrypt.hash(password, 12);
-    
+
     // Update user
     user.password = hashedPassword;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     user.refreshToken = null; // Clear any existing refresh tokens for security
-    await user.save();
+    const result = await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          password: hashedPassword,
+          refreshToken: null, // Clear any existing refresh tokens for security
+          updatedAt: Date.now(),
 
+        },
+        $unset: {
+          resetPasswordToken: "",
+          resetPasswordExpires: "",
+        },
+      },
+    );
+    // Check if update was successful
+    if (result.modifiedCount === 0) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to reset password. Please try again.",
+      });
+    };
+    
     res.status(200).json({
       success: true,
-      message: "Password has been reset successfully. You can now log in with your new password.",
+      message:
+        "Password has been reset successfully. You can now log in with your new password.",
     });
   }),
 );
