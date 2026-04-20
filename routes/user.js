@@ -142,24 +142,117 @@ const sendVerificationEmail = async (email, token) => {
   });
 };
 const sendPasswordResetEmail = async (email, resetToken) => {
-  const resetUrl = `${process.env.BASE_URL}/users/reset-password/${resetToken}`;
+  const BASE_URL = process.env.BASE_URL;
+  const resetUrl = `${BASE_URL}/users/reset-password/${resetToken}`;
+  
+  console.log('Sending reset email to:', email);
+  console.log('Reset URL:', resetUrl);
+  
   await transporter.sendMail({
-    from: `"E-commerce" <${process.env.EMAIL_USER}>`,
+    from: `"E-Com Admin" <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: "Password Reset Request",
+    subject: "Password Reset Request - E-Com Admin",
     html: `
-      <h2>Password Reset Request</h2>
-      <p>You requested to reset your password. Click the link below to reset it:</p>
-      <a href="${resetUrl}" style="padding:10px 20px;background:#4CAF50;color:white;text-decoration:none;border-radius:5px;">
-        Reset Password
-      </a>
-      <p>This link expires in 1 hour.</p>
-      <p>If you didn't request this, you can safely ignore this email.</p>
-      <p><strong>Note:</strong> For security reasons, never share this link with anyone.</p>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f7;
+            margin: 0;
+            padding: 0;
+          }
+          .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 0;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+          }
+          .header h1 {
+            color: white;
+            margin: 0;
+            font-size: 24px;
+          }
+          .content {
+            padding: 30px;
+          }
+          .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 600;
+          }
+          .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+          }
+          .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            margin: 20px 0;
+            font-size: 14px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔐 Password Reset Request</h1>
+          </div>
+          <div class="content">
+            <p>Hello,</p>
+            <p>We received a request to reset the password for your E-Com Admin account.</p>
+            <p>Click the button below to create a new password:</p>
+            <div style="text-align: center;">
+              <a href="${resetUrl}" class="button">Reset Password</a>
+            </div>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="background-color: #f4f4f7; padding: 10px; border-radius: 4px; word-break: break-all;">
+              ${resetUrl}
+            </p>
+            <div class="warning">
+              <strong>⚠️ Important:</strong>
+              <ul style="margin: 8px 0 0 20px;">
+                <li>This link expires in <strong>1 hour</strong></li>
+                <li>You can only use this link once</li>
+                <li>If you didn't request this, please ignore this email</li>
+              </ul>
+            </div>
+            <p>Best regards,<br/>E-Com Admin Team</p>
+          </div>
+          <div class="footer">
+            <p>This is an automated message, please do not reply to this email.</p>
+            <p>&copy; ${new Date().getFullYear()} E-Com Admin. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
     `,
   });
 };
 // ─── Reset Password Page (HTML) ───────────────────────────────────────────────
+// ─── Reset Password Page (HTML) with App Theme Colors ─────────────────────────
 router.get(
   "/reset-password/:token",
   asyncHandler(async (req, res) => {
@@ -170,83 +263,313 @@ router.get(
       resetPasswordExpires: { $gt: Date.now() },
     });
 
+    // Use BASE_URL from environment variables
+    const BASE_URL = process.env.BASE_URL || 'https://ecom-backend-yaqoob-ptgs-projects.vercel.app';
+
     const getResetPasswordPage = (token, isValid) => `
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Reset Password</title>
+        <title>Reset Password - E-Com Admin</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f4f4f9; margin: 0; padding: 20px; }
-          .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 100%; }
-          h1 { color: #333; }
-          .error { color: #f44336; }
-          .success { color: #4CAF50; }
-          input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-          button { width: 100%; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
-          button:hover { background: #45a049; }
-          .message { margin-top: 10px; font-size: 14px; }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            background: #212332;
+            margin: 0; 
+            padding: 20px; 
+          }
+          
+          .card { 
+            background: #2A2D3E;
+            padding: 40px; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3); 
+            text-align: center; 
+            max-width: 450px; 
+            width: 100%; 
+            border: 1px solid rgba(255,255,255,0.1);
+          }
+          
+          h1 { 
+            color: #ffffff; 
+            margin-bottom: 20px;
+            font-size: 28px;
+            font-weight: 600;
+          }
+          
+          .error { 
+            color: #ff6b6b; 
+          }
+          
+          .success { 
+            color: #51cf66; 
+          }
+          
+          .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+          }
+          
+          label {
+            display: block;
+            color: #a0a0b0;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+          }
+          
+          input { 
+            width: 100%; 
+            padding: 14px 16px; 
+            background: #212332;
+            border: 1px solid #3a3d4e; 
+            border-radius: 12px; 
+            box-sizing: border-box;
+            font-size: 16px;
+            color: #ffffff;
+            transition: all 0.3s ease;
+          }
+          
+          input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+          }
+          
+          input::placeholder {
+            color: #6a6d7e;
+          }
+          
+          button { 
+            width: 100%; 
+            padding: 14px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; 
+            border: none; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+          }
+          
+          button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+          }
+          
+          button:disabled { 
+            background: #3a3d4e;
+            transform: none;
+            cursor: not-allowed;
+          }
+          
+          .message { 
+            margin-top: 15px; 
+            font-size: 14px;
+            padding: 10px;
+            border-radius: 8px;
+          }
+          
+          .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s;
+          }
+          
+          .back-link:hover {
+            color: #764ba2;
+            text-decoration: underline;
+          }
+          
+          .requirements {
+            text-align: left;
+            margin-top: 15px;
+            padding: 12px;
+            background: #212332;
+            border-radius: 8px;
+          }
+          
+          .requirements p {
+            color: #a0a0b0;
+            font-size: 12px;
+            margin: 5px 0;
+          }
+          
+          .requirements ul {
+            margin-left: 20px;
+            margin-top: 5px;
+          }
+          
+          .requirements li {
+            color: #a0a0b0;
+            font-size: 12px;
+            margin: 3px 0;
+          }
+          
+          .icon {
+            font-size: 50px;
+            margin-bottom: 20px;
+          }
+          
+          hr {
+            border-color: #3a3d4e;
+            margin: 20px 0;
+          }
         </style>
       </head>
       <body>
         <div class="card">
-          ${
-            isValid
-              ? `
+          ${isValid ? `
+            <div class="icon">🔐</div>
             <h1>Reset Your Password</h1>
+            <p style="color: #a0a0b0; margin-bottom: 25px;">Please enter your new password below</p>
+            
             <form id="resetForm">
-              <input type="password" id="password" placeholder="New Password" required minlength="6">
-              <input type="password" id="confirmPassword" placeholder="Confirm New Password" required minlength="6">
-              <button type="submit">Reset Password</button>
+              <div class="input-group">
+                <label>New Password</label>
+                <input type="password" id="password" placeholder="Enter new password" required minlength="6">
+              </div>
+              
+              <div class="input-group">
+                <label>Confirm Password</label>
+                <input type="password" id="confirmPassword" placeholder="Confirm new password" required minlength="6">
+              </div>
+              
+              <button type="submit" id="submitBtn">Reset Password</button>
               <div id="message" class="message"></div>
             </form>
+            
+            <div class="requirements">
+              <p><strong>Password Requirements:</strong></p>
+              <ul>
+                <li>Minimum 6 characters long</li>
+                <li>Use a mix of letters and numbers</li>
+                <li>Avoid common passwords</li>
+              </ul>
+            </div>
+            
+            <hr>
+            <a href="${BASE_URL}/login" class="back-link">← Back to Login</a>
+            
             <script>
+              const API_BASE_URL = '${BASE_URL}';
+              const resetToken = '${token}';
+              
               document.getElementById('resetForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const password = document.getElementById('password').value;
                 const confirmPassword = document.getElementById('confirmPassword').value;
                 const messageDiv = document.getElementById('message');
+                const submitBtn = document.getElementById('submitBtn');
                 
+                // Clear previous message
+                messageDiv.innerHTML = '';
+                messageDiv.className = 'message';
+                
+                // Validate passwords match
                 if (password !== confirmPassword) {
-                  messageDiv.innerHTML = '<span class="error">Passwords do not match!</span>';
+                  messageDiv.innerHTML = '<span class="error">❌ Passwords do not match!</span>';
+                  messageDiv.style.background = 'rgba(255,107,107,0.1)';
                   return;
                 }
                 
+                // Validate password length
                 if (password.length < 6) {
-                  messageDiv.innerHTML = '<span class="error">Password must be at least 6 characters!</span>';
+                  messageDiv.innerHTML = '<span class="error">❌ Password must be at least 6 characters!</span>';
+                  messageDiv.style.background = 'rgba(255,107,107,0.1)';
                   return;
                 }
+                
+                // Disable button and show loading
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Resetting Password...';
+                messageDiv.innerHTML = '<span style="color: #667eea;">⏳ Resetting your password...</span>';
+                messageDiv.style.background = 'rgba(102,126,234,0.1)';
                 
                 try {
-                  const response = await fetch('/users/reset-password/${token}', {
+                  const response = await fetch(API_BASE_URL + '/users/reset-password/' + resetToken, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                      'Content-Type': 'application/json',
+                    },
                     body: JSON.stringify({ password, confirmPassword })
                   });
                   
                   const data = await response.json();
                   
                   if (data.success) {
-                    messageDiv.innerHTML = '<span class="success">' + data.message + ' Redirecting to login...</span>';
+                    messageDiv.innerHTML = '<span class="success">✅ ' + data.message + '</span>';
+                    messageDiv.style.background = 'rgba(81,207,102,0.1)';
+                    submitBtn.textContent = 'Success! Redirecting...';
+                    
+                    // Redirect to login page after 3 seconds
                     setTimeout(() => {
-                      window.location.href = 'http://yourfrontend.com/login';
+                      window.location.href = API_BASE_URL + '/login';
                     }, 3000);
                   } else {
-                    messageDiv.innerHTML = '<span class="error">' + data.message + '</span>';
+                    messageDiv.innerHTML = '<span class="error">❌ ' + data.message + '</span>';
+                    messageDiv.style.background = 'rgba(255,107,107,0.1)';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Reset Password';
                   }
                 } catch (error) {
-                  messageDiv.innerHTML = '<span class="error">An error occurred. Please try again.</span>';
+                  console.error('Reset error:', error);
+                  messageDiv.innerHTML = '<span class="error">❌ Network error. Please check your connection and try again.</span>';
+                  messageDiv.style.background = 'rgba(255,107,107,0.1)';
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = 'Reset Password';
                 }
               });
+              
+              // Add real-time password match validation
+              const confirmInput = document.getElementById('confirmPassword');
+              const passwordInput = document.getElementById('password');
+              
+              function validateMatch() {
+                if (confirmInput.value && passwordInput.value !== confirmInput.value) {
+                  confirmInput.style.borderColor = '#ff6b6b';
+                } else {
+                  confirmInput.style.borderColor = '#3a3d4e';
+                }
+              }
+              
+              passwordInput.addEventListener('input', validateMatch);
+              confirmInput.addEventListener('input', validateMatch);
             </script>
-          `
-              : `
+          ` : `
+            <div class="icon">⚠️</div>
             <h1 class="error">Invalid or Expired Link</h1>
-            <p>The password reset link is invalid or has expired.</p>
-            <a href="http://yourfrontend.com/forgot-password" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
+            <p style="color: #a0a0b0; margin: 20px 0;">The password reset link is invalid or has expired.</p>
+            <p style="color: #a0a0b0; font-size: 14px;">This can happen if:</p>
+            <div class="requirements" style="text-align: left; margin: 15px 0;">
+              <ul>
+                <li>The link has been used already</li>
+                <li>More than 1 hour has passed since the request</li>
+                <li>The link was tampered with</li>
+              </ul>
+            </div>
+            <a href="${BASE_URL}/forgot-password" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 12px; font-weight: 600;">
               Request New Reset Link
             </a>
-          `
-          }
+            <br/>
+            <a href="${BASE_URL}/login" class="back-link">← Back to Login</a>
+          `}
         </div>
       </body>
     </html>
