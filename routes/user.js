@@ -142,11 +142,15 @@ const sendVerificationEmail = async (email, token) => {
   });
 };
 const sendPasswordResetEmail = async (email, resetToken) => {
-  const BASE_URL = process.env.BASE_URL;
-  const resetUrl = `${BASE_URL}/users/reset-password/${resetToken}`;
+  const BACKEND_URL = process.env.BASE_URL ;
+  const ADMIN_URL = process.env.ADMIN_BASE_URL ; // Update with your admin URL
+  
+  // The reset link should point to the BACKEND URL (which serves the HTML page)
+  const resetUrl = `${BACKEND_URL}/users/reset-password/${resetToken}`;
   
   console.log('Sending reset email to:', email);
   console.log('Reset URL:', resetUrl);
+  console.log('Admin URL:', ADMIN_URL);
   
   await transporter.sendMail({
     from: `"E-Com Admin" <${process.env.EMAIL_USER}>`,
@@ -213,6 +217,13 @@ const sendPasswordResetEmail = async (email, resetToken) => {
             margin: 20px 0;
             font-size: 14px;
           }
+          .info {
+            background-color: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 12px;
+            margin: 20px 0;
+            font-size: 14px;
+          }
         </style>
       </head>
       <body>
@@ -239,6 +250,9 @@ const sendPasswordResetEmail = async (email, resetToken) => {
                 <li>If you didn't request this, please ignore this email</li>
               </ul>
             </div>
+            <div class="info">
+              <strong>ℹ️ Note:</strong> After resetting your password, you will be redirected to the admin login page.
+            </div>
             <p>Best regards,<br/>E-Com Admin Team</p>
           </div>
           <div class="footer">
@@ -252,7 +266,7 @@ const sendPasswordResetEmail = async (email, resetToken) => {
   });
 };
 // ─── Reset Password Page (HTML) ───────────────────────────────────────────────
-// ─── Reset Password Page (HTML) with App Theme Colors ─────────────────────────
+
 router.get(
   "/reset-password/:token",
   asyncHandler(async (req, res) => {
@@ -263,8 +277,8 @@ router.get(
       resetPasswordExpires: { $gt: Date.now() },
     });
 
-    // Use BASE_URL from environment variables
-    const BASE_URL = process.env.BASE_URL || 'https://ecom-backend-yaqoob-ptgs-projects.vercel.app';
+    // Use different URLs for backend API and frontend redirects
+    const BACKEND_URL = process.env.BASE_URL;  const ADMIN_URL = process.env.ADMIN_BASE_URL ; // Update with your admin URL
 
     const getResetPasswordPage = (token, isValid) => `
     <!DOCTYPE html>
@@ -465,10 +479,13 @@ router.get(
             </div>
             
             <hr>
-            <a href="${BASE_URL}/login" class="back-link">← Back to Login</a>
+            <a href="${ADMIN_URL}/login" class="back-link">← Back to Login</a>
             
             <script>
-              const API_BASE_URL = '${BASE_URL}';
+              // Use BACKEND_URL for API calls
+              const API_BASE_URL = '${BACKEND_URL}';
+              // Use ADMIN_URL for frontend redirects
+              const ADMIN_BASE_URL = '${ADMIN_URL}';
               const resetToken = '${token}';
               
               document.getElementById('resetForm').addEventListener('submit', async (e) => {
@@ -518,9 +535,9 @@ router.get(
                     messageDiv.style.background = 'rgba(81,207,102,0.1)';
                     submitBtn.textContent = 'Success! Redirecting...';
                     
-                    // Redirect to login page after 3 seconds
+                    // Redirect to admin login page after 3 seconds
                     setTimeout(() => {
-                      window.location.href = API_BASE_URL + '/login';
+                      window.location.href = ADMIN_BASE_URL + '/login';
                     }, 3000);
                   } else {
                     messageDiv.innerHTML = '<span class="error">❌ ' + data.message + '</span>';
@@ -564,11 +581,11 @@ router.get(
                 <li>The link was tampered with</li>
               </ul>
             </div>
-            <a href="${BASE_URL}/forgot-password" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 12px; font-weight: 600;">
+            <a href="${ADMIN_URL}/forgot-password" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 12px; font-weight: 600;">
               Request New Reset Link
             </a>
             <br/>
-            <a href="${BASE_URL}/login" class="back-link">← Back to Login</a>
+            <a href="${ADMIN_URL}/login" class="back-link">← Back to Login</a>
           `}
         </div>
       </body>
