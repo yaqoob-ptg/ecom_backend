@@ -125,19 +125,121 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendVerificationEmail = async (email, token) => {
-  const verifyUrl = `${process.env.BASE_URL}/users/verify-email/${token}`;
+  const BACKEND_URL = process.env.BASE_URL;
+  const verifyUrl = `${BACKEND_URL}/users/verify-email/${token}`;
+  
   await transporter.sendMail({
-    from: `"E-commerce" <${process.env.EMAIL_USER}>`,
+    from: `"E-Com Admin" <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: "Verify Your Email Address",
+    subject: "Verify Your Email Address - E-Com Admin",
     html: `
-      <h2>Email Verification</h2>
-      <p>Thanks for registering! Please verify your email by clicking the link below:</p>
-      <a href="${verifyUrl}" style="padding:10px 20px;background:#4CAF50;color:white;text-decoration:none;border-radius:5px;">
-        Verify Email
-      </a>
-      <p>This link expires in 24 hours.</p>
-      <p>If you didn't register, you can safely ignore this email.</p>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f7;
+            margin: 0;
+            padding: 0;
+          }
+          .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 0;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+          }
+          .header h1 {
+            color: white;
+            margin: 0;
+            font-size: 24px;
+          }
+          .content {
+            padding: 30px;
+          }
+          .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #EC6813;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 600;
+          }
+          .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+          }
+          .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            margin: 20px 0;
+            font-size: 14px;
+          }
+          .link-box {
+            background-color: #f4f4f7;
+            padding: 10px;
+            border-radius: 4px;
+            word-break: break-all;
+            font-size: 12px;
+            margin: 10px 0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📧 Email Verification Required</h1>
+          </div>
+          <div class="content">
+            <p>Hello,</p>
+            <p>Thanks for registering for an E-Com Admin account!</p>
+            <p>Please verify your email address to activate your account:</p>
+            
+            <div style="text-align: center;">
+              <a href="${verifyUrl}" class="button">Verify Email Address</a>
+            </div>
+            
+            <p>Or copy and paste this link into your browser:</p>
+            <div class="link-box">
+              ${verifyUrl}
+            </div>
+            
+            <div class="warning">
+              <strong>⚠️ Important:</strong>
+              <ul style="margin: 8px 0 0 20px;">
+                <li>This link expires in <strong>24 hours</strong></li>
+                <li>You must verify your email before you can log in</li>
+                <li>If you didn't register, you can safely ignore this email</li>
+              </ul>
+            </div>
+            
+            <p>Best regards,<br/>E-Com Admin Team</p>
+          </div>
+          <div class="footer">
+            <p>This is an automated message, please do not reply to this email.</p>
+            <p>&copy; ${new Date().getFullYear()} E-Com Admin. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
     `,
   });
 };
@@ -197,7 +299,7 @@ const sendPasswordResetEmail = async (email, resetToken) => {
             display: inline-block;
             padding: 12px 30px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #ffffff;
+             color: #ffffff !important;
             text-decoration: none;
             border-radius: 8px;
             margin: 20px 0;
@@ -537,7 +639,7 @@ router.get(
                     
                     // Redirect to admin login page after 3 seconds
                     setTimeout(() => {
-                      window.location.href = ADMIN_BASE_URL + '/login';
+                      window.location.href = ADMIN_BASE_URL + '/#/login';
                     }, 3000);
                   } else {
                     messageDiv.innerHTML = '<span class="error">❌ ' + data.message + '</span>';
@@ -581,7 +683,7 @@ router.get(
                 <li>The link was tampered with</li>
               </ul>
             </div>
-            <a href="${ADMIN_URL}/forgot-password" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 12px; font-weight: 600;">
+            <a href="${ADMIN_URL}/#/login" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 12px; font-weight: 600;">
               Request New Reset Link
             </a>
             <br/>
