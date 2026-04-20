@@ -479,7 +479,7 @@ router.get(
             </div>
             
             <hr>
-            <a href="${ADMIN_URL}/login" class="back-link">← Back to Login</a>
+            <a href="${ADMIN_URL}/#/login" class="back-link">← Back to Login</a>
             
             <script>
               // Use BACKEND_URL for API calls
@@ -585,7 +585,7 @@ router.get(
               Request New Reset Link
             </a>
             <br/>
-            <a href="${ADMIN_URL}/login" class="back-link">← Back to Login</a>
+            <a href="${ADMIN_URL}/#/login" class="back-link">← Back to Login</a>
           `}
         </div>
       </body>
