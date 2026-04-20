@@ -436,14 +436,13 @@ router.post(
       });
     }
 
-    const user = await User.findOne({ email }).select("_id isVerified email");
+    const user = await User.findOne({ email });
 
     // For security, always return success even if user doesn't exist
     if (!user) {
       return res.status(200).json({
         success: true,
-        message:
-          "If an account exists with that email, you will receive a password reset link.",
+        message: "If an account exists with that email, you will receive a password reset link.",
       });
     }
 
@@ -451,8 +450,50 @@ router.post(
     if (!user.isVerified) {
       return res.status(403).json({
         success: false,
-        message:
-          "Please verify your email address before requesting a password reset.",
+        message: "Please verify your email address before requesting a password reset.",
+      });
+    }
+
+    // ✅ Check if user has successfully reset password within last 24 hours
+    if (user.passwordResetRequests?.lastResetDate) {
+      const hoursSinceLastReset = (Date.now() - new Date(user.passwordResetRequests.lastResetDate).getTime()) / (1000 * 60 * 60);
+      if (hoursSinceLastReset < 24) {
+        const remainingHours = Math.ceil(24 - hoursSinceLastReset);
+        return res.status(429).json({
+          success: false,
+          message: `You recently reset your password. Please wait ${remainingHours} hours before requesting another reset.`,
+        });
+      }
+    }
+
+    // ✅ Initialize or get existing rate limit data
+    let resetRequests = user.passwordResetRequests || {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+
+    // Check if firstRequestDate exists and if it's from today
+    if (resetRequests.firstRequestDate) {
+      const requestDate = new Date(resetRequests.firstRequestDate);
+      requestDate.setHours(0, 0, 0, 0);
+      
+      // If request date is not today, reset the counter
+      if (requestDate.getTime() !== today.getTime()) {
+        resetRequests = {
+          count: 0,
+          firstRequestDate: today,
+          lastResetDate: resetRequests.lastResetDate
+        };
+      }
+    } else {
+      // First request ever
+      resetRequests.firstRequestDate = today;
+    }
+
+    // ✅ Check if user has exceeded 3 requests per day
+    if (resetRequests.count >= 3) {
+      return res.status(429).json({
+        success: false,
+        message: "You have exceeded the maximum of 3 password reset requests per day. Please try again tomorrow.",
       });
     }
 
@@ -460,45 +501,53 @@ router.post(
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetTokenExpires = Date.now() + 60 * 60 * 1000; // 1 hour
 
+    // ✅ Update user with rate limiting data
+    const updatedUser = await User.findByIdAndUpdate(
+      user._id,
+      {
+        $set: {
+          resetPasswordToken: resetToken,
+          resetPasswordExpires: resetTokenExpires,
+          'passwordResetRequests.count': (resetRequests.count + 1),
+          'passwordResetRequests.firstRequestDate': resetRequests.firstRequestDate,
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update user with reset token.",
+      });
+    }
+
     try {
-      // ✅ Update only the reset token fields
-      const result = await User.updateOne(
-        { _id: user._id },
-        {
-          $set: {
-            resetPasswordToken: resetToken,
-            resetPasswordExpires: resetTokenExpires,
-          },
-        },
-      );
-
-      if (result.modifiedCount === 0) {
-        throw new Error("Failed to update user");
-      }
-
       await sendPasswordResetEmail(user.email, resetToken);
-
+      
       res.status(200).json({
         success: true,
         message: "Password reset link has been sent to your email address.",
+        remainingAttempts: 3 - (resetRequests.count + 1)
       });
-    } catch (error) {
-      // ✅ Clean up if anything fails
-      await User.updateOne(
-        { _id: user._id },
+    } catch (emailError) {
+      // Clear reset token and decrement count if email fails
+      await User.findByIdAndUpdate(
+        user._id,
         {
           $unset: {
             resetPasswordToken: "",
             resetPasswordExpires: "",
           },
-        },
+          $inc: {
+            'passwordResetRequests.count': -1 // Decrement count on failure
+          }
+        }
       );
-
-      console.error("Forgot password error:", error);
-
+      
       return res.status(500).json({
         success: false,
-        message: "Failed to process request. Please try again later.",
+        message: "Failed to send password reset email. Please try again later.",
       });
     }
   }),
@@ -510,6 +559,7 @@ router.post(
     const { token } = req.params;
     const { password, confirmPassword } = req.body;
 
+    // Validation checks
     if (!password || !confirmPassword) {
       return res.status(400).json({
         success: false,
@@ -540,50 +590,58 @@ router.post(
     if (!user) {
       return res.status(400).json({
         success: false,
-        message:
-          "Password reset token is invalid or has expired. Please request a new one.",
+        message: "Password reset token is invalid or has expired. Please request a new one.",
       });
+    }
+
+    // ✅ Check if user has already reset password within last 24 hours
+    if (user.passwordResetRequests?.lastResetDate) {
+      const hoursSinceLastReset = (Date.now() - new Date(user.passwordResetRequests.lastResetDate).getTime()) / (1000 * 60 * 60);
+      if (hoursSinceLastReset < 24) {
+        const remainingHours = Math.ceil(24 - hoursSinceLastReset);
+        return res.status(429).json({
+          success: false,
+          message: `You have already reset your password. Please wait ${remainingHours} hours before resetting again.`,
+        });
+      }
     }
 
     // Hash new password
     const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Update user
-    user.password = hashedPassword;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-    user.refreshToken = null; // Clear any existing refresh tokens for security
+    
+    // ✅ Update using updateOne with cooldown tracking
     const result = await User.updateOne(
       { _id: user._id },
       {
         $set: {
           password: hashedPassword,
-          refreshToken: null, // Clear any existing refresh tokens for security
-          updatedAt: Date.now(),
-
+          refreshToken: null,
+          'passwordResetRequests.lastResetDate': new Date(), // Track last reset
         },
         $unset: {
           resetPasswordToken: "",
           resetPasswordExpires: "",
-        },
-      },
+        }
+      }
     );
+
     // Check if update was successful
     if (result.modifiedCount === 0) {
       return res.status(500).json({
         success: false,
         message: "Failed to reset password. Please try again.",
       });
-    };
-    
+    }
+
+    // Optional: Send confirmation email
+    // await sendPasswordChangeConfirmationEmail(user.email);
+
     res.status(200).json({
       success: true,
-      message:
-        "Password has been reset successfully. You can now log in with your new password.",
+      message: "Password has been reset successfully. You can now log in with your new password.",
     });
   }),
 );
-
 // ─── Verify Reset Token ───────────────────────────────────────────────────────
 router.get(
   "/verify-reset-token/:token",

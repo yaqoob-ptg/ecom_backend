@@ -95,6 +95,11 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: undefined,
   },
+  passwordResetRequests: {
+    count: { type: Number, default: 0 },
+    firstRequestDate: { type: Date, default: null },
+    lastResetDate: { type: Date, default: null }, // Track last successful reset
+  },
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
