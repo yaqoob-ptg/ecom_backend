@@ -113,6 +113,7 @@ const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const User = require("../model/user");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto"); 
 
 // ─── Email Transporter ─────────────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
@@ -140,7 +141,120 @@ const sendVerificationEmail = async (email, token) => {
     `,
   });
 };
+const sendPasswordResetEmail = async (email, resetToken) => {
+  const resetUrl = `${process.env.BASE_URL}/users/reset-password/${resetToken}`;
+  await transporter.sendMail({
+    from: `"E-commerce" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "Password Reset Request",
+    html: `
+      <h2>Password Reset Request</h2>
+      <p>You requested to reset your password. Click the link below to reset it:</p>
+      <a href="${resetUrl}" style="padding:10px 20px;background:#4CAF50;color:white;text-decoration:none;border-radius:5px;">
+        Reset Password
+      </a>
+      <p>This link expires in 1 hour.</p>
+      <p>If you didn't request this, you can safely ignore this email.</p>
+      <p><strong>Note:</strong> For security reasons, never share this link with anyone.</p>
+    `,
+  });
+};
+// ─── Reset Password Page (HTML) ───────────────────────────────────────────────
+router.get(
+  "/reset-password/:token",
+  asyncHandler(async (req, res) => {
+    const { token } = req.params;
 
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    const getResetPasswordPage = (token, isValid) => `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Reset Password</title>
+        <style>
+          body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f4f4f9; margin: 0; padding: 20px; }
+          .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 100%; }
+          h1 { color: #333; }
+          .error { color: #f44336; }
+          .success { color: #4CAF50; }
+          input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+          button { width: 100%; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+          button:hover { background: #45a049; }
+          .message { margin-top: 10px; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          ${isValid ? `
+            <h1>Reset Your Password</h1>
+            <form id="resetForm">
+              <input type="password" id="password" placeholder="New Password" required minlength="6">
+              <input type="password" id="confirmPassword" placeholder="Confirm New Password" required minlength="6">
+              <button type="submit">Reset Password</button>
+              <div id="message" class="message"></div>
+            </form>
+            <script>
+              document.getElementById('resetForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const password = document.getElementById('password').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                const messageDiv = document.getElementById('message');
+                
+                if (password !== confirmPassword) {
+                  messageDiv.innerHTML = '<span class="error">Passwords do not match!</span>';
+                  return;
+                }
+                
+                if (password.length < 6) {
+                  messageDiv.innerHTML = '<span class="error">Password must be at least 6 characters!</span>';
+                  return;
+                }
+                
+                try {
+                  const response = await fetch('/users/reset-password/${token}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password, confirmPassword })
+                  });
+                  
+                  const data = await response.json();
+                  
+                  if (data.success) {
+                    messageDiv.innerHTML = '<span class="success">' + data.message + ' Redirecting to login...</span>';
+                    setTimeout(() => {
+                      window.location.href = 'http://yourfrontend.com/login';
+                    }, 3000);
+                  } else {
+                    messageDiv.innerHTML = '<span class="error">' + data.message + '</span>';
+                  }
+                } catch (error) {
+                  messageDiv.innerHTML = '<span class="error">An error occurred. Please try again.</span>';
+                }
+              });
+            </script>
+          ` : `
+            <h1 class="error">Invalid or Expired Link</h1>
+            <p>The password reset link is invalid or has expired.</p>
+            <a href="http://yourfrontend.com/forgot-password" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
+              Request New Reset Link
+            </a>
+          `}
+        </div>
+      </body>
+    </html>
+  `;
+
+    if (!user) {
+      return res.status(400).send(getResetPasswordPage(token, false));
+    }
+
+    res.status(200).send(getResetPasswordPage(token, true));
+  }),
+);
 // ─── Register ──────────────────────────────────────────────────────────────────
 router.post(
   "/register",
@@ -305,7 +419,150 @@ router.post(
     });
   }),
 );
+// ─── Forgot Password - Request Reset ──────────────────────────────────────────
+router.post(
+  "/forgot-password",
+  asyncHandler(async (req, res) => {
+    const { email } = req.body;
 
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    // For security, always return success even if user doesn't exist
+    // This prevents email enumeration attacks
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: "If an account exists with that email, you will receive a password reset link.",
+      });
+    }
+
+    // Check if user is verified
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email address before requesting a password reset.",
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+
+    // Save reset token to user
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetTokenExpires;
+    await user.save();
+
+    try {
+      await sendPasswordResetEmail(user.email, resetToken);
+      
+      res.status(200).json({
+        success: true,
+        message: "Password reset link has been sent to your email address.",
+      });
+    } catch (emailError) {
+      // Clear reset token if email fails
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save();
+      
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send password reset email. Please try again later.",
+      });
+    }
+  }),
+);
+
+// ─── Reset Password - Verify Token and Reset ──────────────────────────────────
+router.post(
+  "/reset-password/:token",
+  asyncHandler(async (req, res) => {
+    const { token } = req.params;
+    const { password, confirmPassword } = req.body;
+
+    if (!password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Password and confirm password are required.",
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match.",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long.",
+      });
+    }
+
+    // Find user with valid reset token
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Password reset token is invalid or has expired. Please request a new one.",
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(password, 12);
+    
+    // Update user
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    user.refreshToken = null; // Clear any existing refresh tokens for security
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password has been reset successfully. You can now log in with your new password.",
+    });
+  }),
+);
+
+// ─── Verify Reset Token ───────────────────────────────────────────────────────
+router.get(
+  "/verify-reset-token/:token",
+  asyncHandler(async (req, res) => {
+    const { token } = req.params;
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Password reset token is invalid or has expired.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Token is valid.",
+    });
+  }),
+);
 // ─── Guest Login ───────────────────────────────────────────────────────────────
 router.post(
   "/guest",

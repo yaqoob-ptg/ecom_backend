@@ -74,17 +74,28 @@ const userSchema = new mongoose.Schema({
   //   default: () => Date.now() + 24 * 60 * 60 * 1000,
   // },
   verificationToken: {
-  type: String,
-  default: null,
-},
-verificationTokenExpires: {
-  type: Date,
-  default: null,
-},
+    type: String,
+    default: null,
+  },
+  verificationTokenExpires: {
+    type: Date,
+    default: null,
+  },
   guestExpiresAt: {
     type: Date,
     default: null,
   },
+
+  //for password reset
+  resetPasswordToken: {
+    type: String,
+    default: undefined,
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: undefined,
+  },
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
