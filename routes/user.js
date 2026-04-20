@@ -172,7 +172,7 @@ const sendVerificationEmail = async (email, token) => {
           .button {
             display: inline-block;
             padding: 12px 30px;
-            background: #EC6813;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #ffffff !important;
             text-decoration: none;
             border-radius: 8px;
@@ -1179,24 +1179,116 @@ router.get(
       verificationTokenExpires: { $gt: Date.now() },
     });
 
-    // HTML Template Function
+    const ADMIN_URL = process.env.ADMIN_BASE_URL || 'https://yaqoob-ptg.github.io/ecom_admin_panel_live';
+
     const getHtmlPage = (title, message, isSuccess) => `
     <!DOCTYPE html>
     <html>
       <head>
-        <title>${title}</title>
+        <title>${title} - E-Com Admin</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f4f4f9; margin: 0; }
-          .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
-          h1 { color: ${isSuccess ? "#4CAF50" : "#f44336"}; }
-          .btn { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #4CAF50; color: white; text-decoration: none; border-radius: 5px; }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            background: #212332;
+            margin: 0; 
+            padding: 20px; 
+          }
+          
+          .card { 
+            background: #2A2D3E;
+            padding: 40px; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3); 
+            text-align: center; 
+            max-width: 450px; 
+            width: 100%; 
+            border: 1px solid rgba(255,255,255,0.1);
+          }
+          
+          h1 { 
+            margin-bottom: 20px;
+            font-size: 28px;
+            font-weight: 600;
+            color: ${isSuccess ? "#51cf66" : "#ff6b6b"};
+          }
+          
+          p {
+            color: #a0a0b0;
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 25px;
+          }
+          
+          .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+          }
+          
+          .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #EC6813;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+          }
+          
+          .button:hover {
+            background: #d45a0f;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(236, 104, 19, 0.3);
+          }
+          
+          .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s;
+          }
+          
+          .back-link:hover {
+            color: #764ba2;
+            text-decoration: underline;
+          }
+          
+          hr {
+            border-color: #3a3d4e;
+            margin: 20px 0;
+          }
         </style>
       </head>
       <body>
         <div class="card">
-          <h1>${isSuccess ? "Verified!" : "Oops!"}</h1>
+          <div class="icon">${isSuccess ? "✅" : "❌"}</div>
+          <h1>${isSuccess ? "Email Verified!" : "Verification Failed"}</h1>
           <p>${message}</p>
-          <!-- ${isSuccess ? '<a href="http://yourfrontend.com/login" class="btn">Go to Login</a>' : '<a href="http://yourfrontend.com/register" class="btn">Try Registering Again</a>'} -->
+          ${isSuccess ? `
+            <a href="${ADMIN_URL}/#/login" class="button">Go to Login</a>
+            <br/>
+            <a href="${ADMIN_URL}/#/login" class="back-link">← Back to Login</a>
+          ` : `
+            <a href="${ADMIN_URL}/#/register" class="button">Try Registering Again</a>
+            <br/>
+            <a href="${ADMIN_URL}/#/login" class="back-link">← Back to Login</a>
+          `}
         </div>
       </body>
     </html>
@@ -1208,7 +1300,7 @@ router.get(
         .send(
           getHtmlPage(
             "Verification Failed",
-            "The link is invalid or has expired.",
+            "The verification link is invalid or has expired. Please register again.",
             false,
           ),
         );
@@ -1230,7 +1322,6 @@ router.get(
       );
   }),
 );
-
 // ─── Get All Users ─────────────────────────────────────────────────────────────
 router.get(
   "/",
