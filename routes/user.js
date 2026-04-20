@@ -197,7 +197,7 @@ const sendPasswordResetEmail = async (email, resetToken) => {
             display: inline-block;
             padding: 12px 30px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            color: #ffffff;
             text-decoration: none;
             border-radius: 8px;
             margin: 20px 0;
