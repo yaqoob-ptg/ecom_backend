@@ -127,7 +127,7 @@ const transporter = nodemailer.createTransport({
 const sendVerificationEmail = async (email, token) => {
   const BACKEND_URL = process.env.BASE_URL;
   const verifyUrl = `${BACKEND_URL}/users/verify-email/${token}`;
-  
+
   await transporter.sendMail({
     from: `"E-Com Admin" <${process.env.EMAIL_USER}>`,
     to: email,
@@ -244,16 +244,16 @@ const sendVerificationEmail = async (email, token) => {
   });
 };
 const sendPasswordResetEmail = async (email, resetToken) => {
-  const BACKEND_URL = process.env.BASE_URL ;
-  const ADMIN_URL = process.env.ADMIN_BASE_URL ; // Update with your admin URL
-  
+  const BACKEND_URL = process.env.BASE_URL;
+  const ADMIN_URL = process.env.ADMIN_BASE_URL; // Update with your admin URL
+
   // The reset link should point to the BACKEND URL (which serves the HTML page)
   const resetUrl = `${BACKEND_URL}/users/reset-password/${resetToken}`;
-  
-  console.log('Sending reset email to:', email);
-  console.log('Reset URL:', resetUrl);
-  console.log('Admin URL:', ADMIN_URL);
-  
+
+  console.log("Sending reset email to:", email);
+  console.log("Reset URL:", resetUrl);
+  console.log("Admin URL:", ADMIN_URL);
+
   await transporter.sendMail({
     from: `"E-Com Admin" <${process.env.EMAIL_USER}>`,
     to: email,
@@ -380,7 +380,8 @@ router.get(
     });
 
     // Use different URLs for backend API and frontend redirects
-    const BACKEND_URL = process.env.BASE_URL;  const ADMIN_URL = process.env.ADMIN_BASE_URL ; // Update with your admin URL
+    const BACKEND_URL = process.env.BASE_URL;
+    const ADMIN_URL = process.env.ADMIN_BASE_URL; // Update with your admin URL
 
     const getResetPasswordPage = (token, isValid) => `
     <!DOCTYPE html>
@@ -551,7 +552,9 @@ router.get(
       </head>
       <body>
         <div class="card">
-          ${isValid ? `
+          ${
+            isValid
+              ? `
             <div class="icon">🔐</div>
             <h1>Reset Your Password</h1>
             <p style="color: #a0a0b0; margin-bottom: 25px;">Please enter your new password below</p>
@@ -671,7 +674,8 @@ router.get(
               passwordInput.addEventListener('input', validateMatch);
               confirmInput.addEventListener('input', validateMatch);
             </script>
-          ` : `
+          `
+              : `
             <div class="icon">⚠️</div>
             <h1 class="error">Invalid or Expired Link</h1>
             <p style="color: #a0a0b0; margin: 20px 0;">The password reset link is invalid or has expired.</p>
@@ -688,7 +692,8 @@ router.get(
             </a>
             <br/>
             <a href="${ADMIN_URL}/#/login" class="back-link">← Back to Login</a>
-          `}
+          `
+          }
         </div>
       </body>
     </html>
@@ -787,7 +792,18 @@ router.post(
         message: "Access Denied: You do not have administrative privileges.",
       });
     }
-
+if (user.role === 'admin' && !user.isApproved) {
+  return res.status(403).json({
+    success: false,
+    message: "Your admin account is pending approval by the super admin.",
+  });
+}
+if (!user.isActive) {
+  return res.status(403).json({
+    success: false,
+    message: "Your account has been deactivated. Please contact support.",
+  });
+}
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res
@@ -806,7 +822,7 @@ router.post(
     const accessToken = jwt.sign(
       { _id: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" },
+      { expiresIn: "20m" },
     );
 
     const refreshToken = jwt.sign(
@@ -837,6 +853,7 @@ router.post(
     });
   }),
 );
+
 router.post(
   "/refresh-token",
   asyncHandler(async (req, res) => {
@@ -884,7 +901,8 @@ router.post(
     if (!user) {
       return res.status(200).json({
         success: true,
-        message: "If an account exists with that email, you will receive a password reset link.",
+        message:
+          "If an account exists with that email, you will receive a password reset link.",
       });
     }
 
@@ -892,13 +910,17 @@ router.post(
     if (!user.isVerified) {
       return res.status(403).json({
         success: false,
-        message: "Please verify your email address before requesting a password reset.",
+        message:
+          "Please verify your email address before requesting a password reset.",
       });
     }
 
     // ✅ Check if user has successfully reset password within last 24 hours
     if (user.passwordResetRequests?.lastResetDate) {
-      const hoursSinceLastReset = (Date.now() - new Date(user.passwordResetRequests.lastResetDate).getTime()) / (1000 * 60 * 60);
+      const hoursSinceLastReset =
+        (Date.now() -
+          new Date(user.passwordResetRequests.lastResetDate).getTime()) /
+        (1000 * 60 * 60);
       if (hoursSinceLastReset < 24) {
         const remainingHours = Math.ceil(24 - hoursSinceLastReset);
         return res.status(429).json({
@@ -917,13 +939,13 @@ router.post(
     if (resetRequests.firstRequestDate) {
       const requestDate = new Date(resetRequests.firstRequestDate);
       requestDate.setHours(0, 0, 0, 0);
-      
+
       // If request date is not today, reset the counter
       if (requestDate.getTime() !== today.getTime()) {
         resetRequests = {
           count: 0,
           firstRequestDate: today,
-          lastResetDate: resetRequests.lastResetDate
+          lastResetDate: resetRequests.lastResetDate,
         };
       }
     } else {
@@ -935,7 +957,8 @@ router.post(
     if (resetRequests.count >= 3) {
       return res.status(429).json({
         success: false,
-        message: "You have exceeded the maximum of 3 password reset requests per day. Please try again tomorrow.",
+        message:
+          "You have exceeded the maximum of 3 password reset requests per day. Please try again tomorrow.",
       });
     }
 
@@ -950,11 +973,12 @@ router.post(
         $set: {
           resetPasswordToken: resetToken,
           resetPasswordExpires: resetTokenExpires,
-          'passwordResetRequests.count': (resetRequests.count + 1),
-          'passwordResetRequests.firstRequestDate': resetRequests.firstRequestDate,
-        }
+          "passwordResetRequests.count": resetRequests.count + 1,
+          "passwordResetRequests.firstRequestDate":
+            resetRequests.firstRequestDate,
+        },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedUser) {
@@ -966,27 +990,24 @@ router.post(
 
     try {
       await sendPasswordResetEmail(user.email, resetToken);
-      
+
       res.status(200).json({
         success: true,
         message: "Password reset link has been sent to your email address.",
-        remainingAttempts: 3 - (resetRequests.count + 1)
+        remainingAttempts: 3 - (resetRequests.count + 1),
       });
     } catch (emailError) {
       // Clear reset token and decrement count if email fails
-      await User.findByIdAndUpdate(
-        user._id,
-        {
-          $unset: {
-            resetPasswordToken: "",
-            resetPasswordExpires: "",
-          },
-          $inc: {
-            'passwordResetRequests.count': -1 // Decrement count on failure
-          }
-        }
-      );
-      
+      await User.findByIdAndUpdate(user._id, {
+        $unset: {
+          resetPasswordToken: "",
+          resetPasswordExpires: "",
+        },
+        $inc: {
+          "passwordResetRequests.count": -1, // Decrement count on failure
+        },
+      });
+
       return res.status(500).json({
         success: false,
         message: "Failed to send password reset email. Please try again later.",
@@ -1032,13 +1053,17 @@ router.post(
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: "Password reset token is invalid or has expired. Please request a new one.",
+        message:
+          "Password reset token is invalid or has expired. Please request a new one.",
       });
     }
 
     // ✅ Check if user has already reset password within last 24 hours
     if (user.passwordResetRequests?.lastResetDate) {
-      const hoursSinceLastReset = (Date.now() - new Date(user.passwordResetRequests.lastResetDate).getTime()) / (1000 * 60 * 60);
+      const hoursSinceLastReset =
+        (Date.now() -
+          new Date(user.passwordResetRequests.lastResetDate).getTime()) /
+        (1000 * 60 * 60);
       if (hoursSinceLastReset < 24) {
         const remainingHours = Math.ceil(24 - hoursSinceLastReset);
         return res.status(429).json({
@@ -1050,7 +1075,7 @@ router.post(
 
     // Hash new password
     const hashedPassword = await bcrypt.hash(password, 12);
-    
+
     // ✅ Update using updateOne with cooldown tracking
     const result = await User.updateOne(
       { _id: user._id },
@@ -1058,13 +1083,13 @@ router.post(
         $set: {
           password: hashedPassword,
           refreshToken: null,
-          'passwordResetRequests.lastResetDate': new Date(), // Track last reset
+          "passwordResetRequests.lastResetDate": new Date(), // Track last reset
         },
         $unset: {
           resetPasswordToken: "",
           resetPasswordExpires: "",
-        }
-      }
+        },
+      },
     );
 
     // Check if update was successful
@@ -1080,7 +1105,8 @@ router.post(
 
     res.status(200).json({
       success: true,
-      message: "Password has been reset successfully. You can now log in with your new password.",
+      message:
+        "Password has been reset successfully. You can now log in with your new password.",
     });
   }),
 );
@@ -1179,7 +1205,9 @@ router.get(
       verificationTokenExpires: { $gt: Date.now() },
     });
 
-    const ADMIN_URL = process.env.ADMIN_BASE_URL || 'https://yaqoob-ptg.github.io/ecom_admin_panel_live';
+    const ADMIN_URL =
+      process.env.ADMIN_BASE_URL ||
+      "https://yaqoob-ptg.github.io/ecom_admin_panel_live";
 
     const getHtmlPage = (title, message, isSuccess) => `
     <!DOCTYPE html>
@@ -1280,15 +1308,19 @@ router.get(
           <div class="icon">${isSuccess ? "✅" : "❌"}</div>
           <h1>${isSuccess ? "Email Verified!" : "Verification Failed"}</h1>
           <p>${message}</p>
-          ${isSuccess ? `
+          ${
+            isSuccess
+              ? `
             <a href="${ADMIN_URL}/#/login" class="button">Go to Login</a>
             <br/>
             <a href="${ADMIN_URL}/#/login" class="back-link">← Back to Login</a>
-          ` : `
+          `
+              : `
             <a href="${ADMIN_URL}/#/register" class="button">Try Registering Again</a>
             <br/>
             <a href="${ADMIN_URL}/#/login" class="back-link">← Back to Login</a>
-          `}
+          `
+          }
         </div>
       </body>
     </html>

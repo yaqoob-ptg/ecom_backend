@@ -39,8 +39,6 @@
 //     }
 // }));
 
-
-
 // // create new product
 // router.post('/', asyncHandler(async (req, res) => {
 //     try {
@@ -101,8 +99,6 @@
 //         res.status(500).json({ success: false, message: error.message });
 //     }
 // }));
-
-
 
 // // Update a product
 // router.put('/:id', asyncHandler(async (req, res) => {
@@ -184,100 +180,145 @@
 
 // module.exports = router;
 
-
-
-
 //with cloudinary and multer
 
-const express    = require('express');
-const router     = express.Router();
-const multer     = require('multer');
-const Product    = require('../model/product');
-const cloudinary = require('../config/cloudinary');
-const { upload, uploadToCloudinary } = require('../middleware/uploadMiddleware');
-const asyncHandler = require('express-async-handler');
-const auth = require('../middleware/auth');
+const express = require("express");
+const router = express.Router();
+const multer = require("multer");
+const Product = require("../model/product");
+const cloudinary = require("../config/cloudinary");
+const {
+  upload,
+  uploadToCloudinary,
+} = require("../middleware/uploadMiddleware");
+const asyncHandler = require("express-async-handler");
+const auth = require("../middleware/auth");
 
-const IMAGE_FIELDS = ['image1', 'image2', 'image3', 'image4', 'image5'];
-const multerFields = IMAGE_FIELDS.map(f => ({ name: f, maxCount: 1 }));
+const IMAGE_FIELDS = ["image1", "image2", "image3", "image4", "image5"];
+const multerFields = IMAGE_FIELDS.map((f) => ({ name: f, maxCount: 1 }));
 
 // ─── GET ALL ─────────────────────────────────────────────────────────────────
-router.get('/',auth, asyncHandler(async (req, res) => {
-        let filter = {};
+router.get(
+  "/",
+  auth,
+  asyncHandler(async (req, res) => {
+    let filter = {};
 
     // 👇 if admin → only their products
-    if (req.user.role === 'admin') {
-        filter.adminId = req.user._id;
+    if (req.user.role === "admin") {
+      filter.adminId = req.user._id;
     }
     const products = await Product.find(filter)
-        .populate('proCategoryId',    'id name')
-        .populate('proSubCategoryId', 'id name')
-        .populate('proBrandId',       'id name')
-        .populate('proVariantTypeId', 'id type')
-        .populate('proVariantId',     'id name');
+      .populate("proCategoryId", "id name")
+      .populate("proSubCategoryId", "id name")
+      .populate("proBrandId", "id name")
+      .populate("proVariantTypeId", "id type")
+      .populate("proVariantId", "id name")
+      .populate("adminId", "name");
 
-    res.json({ success: true, message: "Products retrieved successfully.", data: products });
-}));
+    res.json({
+      success: true,
+      message: "Products retrieved successfully.",
+      data: products,
+    });
+  }),
+);
 
 // ─── GET BY ID ───────────────────────────────────────────────────────────────
-router.get('/:id', asyncHandler(async (req, res) => {
+router.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id)
-        .populate('proCategoryId',    'id name')
-        .populate('proSubCategoryId', 'id name')
-        .populate('proBrandId',       'id name')
-        .populate('proVariantTypeId', 'id name')
-        .populate('proVariantId',     'id name');
+      .populate("proCategoryId", "id name")
+      .populate("proSubCategoryId", "id name")
+      .populate("proBrandId", "id name")
+      .populate("proVariantTypeId", "id name")
+      .populate("proVariantId", "id name")
+      .populate("adminId", "name");
 
     if (!product) {
-        return res.status(404).json({ success: false, message: "Product not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found." });
     }
-    res.json({ success: true, message: "Product retrieved successfully.", data: product });
-}));
+    res.json({
+      success: true,
+      message: "Product retrieved successfully.",
+      data: product,
+    });
+  }),
+);
 
 // ─── CREATE ──────────────────────────────────────────────────────────────────
-router.post('/', auth, asyncHandler(async (req, res) => {
+router.post(
+  "/",
+  auth,
+  asyncHandler(async (req, res) => {
     upload.fields(multerFields)(req, res, async (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size too large. Max 5MB per image.';
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(500).json({ success: false, message: err.message });
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE")
+          err.message = "File size too large. Max 5MB per image.";
+        return res.status(400).json({ success: false, message: err.message });
+      } else if (err) {
+        return res.status(500).json({ success: false, message: err.message });
+      }
+
+      const {
+        name,
+        description,
+        quantity,
+        price,
+        offerPrice,
+        proCategoryId,
+        proSubCategoryId,
+        proBrandId,
+        proVariantTypeId,
+        proVariantId,
+      } = req.body;
+
+      if (!name || !quantity || !price || !proCategoryId || !proSubCategoryId) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Required fields are missing." });
+      }
+
+      // Upload each image buffer to Cloudinary
+      const imageUrls = [];
+      for (let i = 0; i < IMAGE_FIELDS.length; i++) {
+        const field = IMAGE_FIELDS[i];
+        if (req.files?.[field]?.[0]) {
+          const { url, publicId } = await uploadToCloudinary(
+            req.files[field][0].buffer,
+            "products",
+          );
+          imageUrls.push({ image: i + 1, url, publicId });
         }
+      }
 
-        const {    
-              name, description, quantity, price, offerPrice,
-                proCategoryId, proSubCategoryId, proBrandId,
-                proVariantTypeId, proVariantId } = req.body;
+      const newProduct = new Product({
+        adminId: req.user._id,
+        name,
+        description,
+        quantity,
+        price,
+        offerPrice,
+        proCategoryId,
+        proSubCategoryId,
+        proBrandId,
+        proVariantTypeId,
+        proVariantId,
+        images: imageUrls,
+      });
 
-        if (!name || !quantity || !price || !proCategoryId || !proSubCategoryId) {
-            return res.status(400).json({ success: false, message: "Required fields are missing." });
-        }
-
-        // Upload each image buffer to Cloudinary
-        const imageUrls = [];
-        for (let i = 0; i < IMAGE_FIELDS.length; i++) {
-            const field = IMAGE_FIELDS[i];
-            if (req.files?.[field]?.[0]) {
-                const { url, publicId } = await uploadToCloudinary(
-                    req.files[field][0].buffer,
-                    'products'
-                );
-                imageUrls.push({ image: i + 1, url, publicId });
-            }
-        }
-
-        const newProduct = new Product({
-            adminId: req.user._id,
-            name, description, quantity, price, offerPrice,
-            proCategoryId, proSubCategoryId, proBrandId,
-            proVariantTypeId, proVariantId,
-            images: imageUrls,
-        });
-
-        await newProduct.save();
-        res.json({ success: true, message: "Product created successfully.", data: newProduct });
+      await newProduct.save();
+      res.json({
+        success: true,
+        message: "Product created successfully.",
+        data: newProduct,
+      });
     });
-}));
+  }),
+);
 // router.post(
 //   '/',
 //   upload.fields(multerFields),
@@ -342,60 +383,88 @@ router.post('/', auth, asyncHandler(async (req, res) => {
 // );
 
 // ─── UPDATE ──────────────────────────────────────────────────────────────────
-router.put('/:id', asyncHandler(async (req, res) => {
+router.put(
+  "/:id",
+  asyncHandler(async (req, res) => {
     upload.fields(multerFields)(req, res, async (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size too large. Max 5MB per image.';
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(500).json({ success: false, message: err.message });
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE")
+          err.message = "File size too large. Max 5MB per image.";
+        return res.status(400).json({ success: false, message: err.message });
+      } else if (err) {
+        return res.status(500).json({ success: false, message: err.message });
+      }
+
+      const product = await Product.findById(req.params.id);
+      if (!product) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Product not found." });
+      }
+
+      // Update text fields
+      const fields = [
+        "name",
+        "description",
+        "quantity",
+        "price",
+        "offerPrice",
+        "proCategoryId",
+        "proSubCategoryId",
+        "proBrandId",
+        "proVariantTypeId",
+        "proVariantId",
+      ];
+      fields.forEach((f) => {
+        if (req.body[f] !== undefined) product[f] = req.body[f];
+      });
+
+      // Update images — delete old from Cloudinary, upload new
+      for (let i = 0; i < IMAGE_FIELDS.length; i++) {
+        const field = IMAGE_FIELDS[i];
+        const slotNumber = i + 1;
+
+        if (req.files?.[field]?.[0]) {
+          const existing = product.images.find(
+            (img) => img.image === slotNumber,
+          );
+
+          // Delete old image from Cloudinary
+          if (existing?.publicId) {
+            await cloudinary.uploader
+              .destroy(existing.publicId)
+              .catch((e) =>
+                console.error(
+                  `Cloudinary delete failed for ${existing.publicId}:`,
+                  e.message,
+                ),
+              );
+          }
+
+          // Upload new image
+          const { url, publicId } = await uploadToCloudinary(
+            req.files[field][0].buffer,
+            "products",
+          );
+
+          if (existing) {
+            existing.url = url;
+            existing.publicId = publicId;
+          } else {
+            product.images.push({ image: slotNumber, url, publicId });
+          }
         }
+      }
 
-        const product = await Product.findById(req.params.id);
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found." });
-        }
-
-        // Update text fields
-        const fields = ['name','description','quantity','price','offerPrice',
-                        'proCategoryId','proSubCategoryId','proBrandId',
-                        'proVariantTypeId','proVariantId'];
-        fields.forEach(f => { if (req.body[f] !== undefined) product[f] = req.body[f]; });
-
-        // Update images — delete old from Cloudinary, upload new
-        for (let i = 0; i < IMAGE_FIELDS.length; i++) {
-            const field = IMAGE_FIELDS[i];
-            const slotNumber = i + 1;
-
-            if (req.files?.[field]?.[0]) {
-                const existing = product.images.find(img => img.image === slotNumber);
-
-                // Delete old image from Cloudinary
-                if (existing?.publicId) {
-                    await cloudinary.uploader.destroy(existing.publicId).catch(e =>
-                        console.error(`Cloudinary delete failed for ${existing.publicId}:`, e.message)
-                    );
-                }
-
-                // Upload new image
-                const { url, publicId } = await uploadToCloudinary(
-                    req.files[field][0].buffer,
-                    'products'
-                );
-
-                if (existing) {
-                    existing.url      = url;
-                    existing.publicId = publicId;
-                } else {
-                    product.images.push({ image: slotNumber, url, publicId });
-                }
-            }
-        }
-
-        await product.save();
-        res.json({ success: true, message: "Product updated successfully.", data: product });
+      await product.save();
+      res.json({
+        success: true,
+        message: "Product updated successfully.",
+        data: product,
+      });
     });
-}));
+  }),
+);
 // router.put(
 //   '/:id',
 //   upload.fields(multerFields),
@@ -468,25 +537,39 @@ router.put('/:id', asyncHandler(async (req, res) => {
 // );
 
 // ─── DELETE ──────────────────────────────────────────────────────────────────
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id);
     if (!product) {
-        return res.status(404).json({ success: false, message: "Product not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found." });
     }
 
     // Delete all images from Cloudinary
     await Promise.all(
-        product.images
-            .filter(img => img.publicId)
-            .map(img =>
-                cloudinary.uploader.destroy(img.publicId).catch(e =>
-                    console.error(`Cloudinary delete failed for ${img.publicId}:`, e.message)
-                )
-            )
+      product.images
+        .filter((img) => img.publicId)
+        .map((img) =>
+          cloudinary.uploader
+            .destroy(img.publicId)
+            .catch((e) =>
+              console.error(
+                `Cloudinary delete failed for ${img.publicId}:`,
+                e.message,
+              ),
+            ),
+        ),
     );
 
     await product.deleteOne();
-    res.json({ success: true, message: "Product deleted successfully.", data: null });
-}));
+    res.json({
+      success: true,
+      message: "Product deleted successfully.",
+      data: null,
+    });
+  }),
+);
 
 module.exports = router;

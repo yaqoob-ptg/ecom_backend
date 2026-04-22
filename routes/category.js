@@ -149,78 +149,143 @@
 //     }
 // }));
 
-
 // module.exports = router;
 
-
-
 //with cloudinary
-const express      = require('express');
-const router       = express.Router();
-const multer       = require('multer');
-const Category     = require('../model/category');
-const SubCategory  = require('../model/subCategory');
-const Product      = require('../model/product');
-const cloudinary   = require('../config/cloudinary');
-const { upload, uploadToCloudinary } = require('../middleware/uploadMiddleware');
-const asyncHandler = require('express-async-handler');
-const auth = require('../middleware/auth');
+const express = require("express");
+const router = express.Router();
+const multer = require("multer");
+const Category = require("../model/category");
+const SubCategory = require("../model/subCategory");
+const Product = require("../model/product");
+const cloudinary = require("../config/cloudinary");
+const {
+  upload,
+  uploadToCloudinary,
+} = require("../middleware/uploadMiddleware");
+const asyncHandler = require("express-async-handler");
+const auth = require("../middleware/auth");
+
+router.use(auth);
 
 // ─── GET ALL CATEGORIES ───────────────────────────────────────────────────────
-router.get('/', auth, asyncHandler(async (req, res) => {
-    let filters={};
-    if(req.user.role=='admin'){
-        filters.adminId=req.user._id;
+router.get(
+  "/",
+  asyncHandler(async (req, res) => {
+    let filters = {};
+    // if(req.user.role=='admin'){
+    //     filters.adminId=req.user._id;
+    // }
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
     }
 
     const categories = await Category.find(filters);
 
-
-    res.json({ success: true, message: "Categories retrieved successfully.", data: categories });
-}));
+    res.json({
+      success: true,
+      message: "Categories retrieved successfully.",
+      data: categories,
+    });
+  }),
+);
 
 // ─── GET CATEGORY BY ID ───────────────────────────────────────────────────────
-router.get('/:id', asyncHandler(async (req, res) => {
+router.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Check permission (superAdmin only)
+    if (req.user.role !== "superAdmin") {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission. Admin access required.",
+      });
+    }
     const category = await Category.findById(req.params.id);
     if (!category) {
-        return res.status(404).json({ success: false, message: "Category not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Category not found." });
     }
-    res.json({ success: true, message: "Category retrieved successfully.", data: category });
-}));
- 
-// ─── CREATE CATEGORY ──────────────────────────────────────────────────────────
-router.post('/', auth, asyncHandler(async (req, res) => {
-    upload.single('img')(req, res, async (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(500).json({ success: false, message: err.message });
-        }
-
-        const { name } = req.body;
-
-        if (!name) {
-            return res.status(400).json({ success: false, message: "Name is required." });
-        }
-
-        // Upload image to Cloudinary
-        let image    = 'no_url';
-        let publicId = null;
-
-        if (req.file) {
-
-            const result = await uploadToCloudinary(req.file.buffer, 'categories');
-            image    = result.url;
-            publicId = result.publicId;
-        }
-
-        const newCategory = new Category({adminId: req.user._id,  name, image, publicId });
-        await newCategory.save();
-
-        res.json({ success: true, message: "Category created successfully.", data: null });
+    res.json({
+      success: true,
+      message: "Category retrieved successfully.",
+      data: category,
     });
-}));
+  }),
+);
+
+// ─── CREATE CATEGORY ──────────────────────────────────────────────────────────
+router.post(
+  "/",
+  asyncHandler(async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Check permission (superAdmin only)
+    if (req.user.role !== "superAdmin") {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission. Admin access required.",
+      });
+    }
+    upload.single("img")(req, res, async (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE")
+          err.message = "File size is too large. Maximum filesize is 5MB.";
+        return res.status(400).json({ success: false, message: err.message });
+      } else if (err) {
+        return res.status(500).json({ success: false, message: err.message });
+      }
+
+      const { name } = req.body;
+
+      if (!name) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Name is required." });
+      }
+
+      // Upload image to Cloudinary
+      let image = "no_url";
+      let publicId = null;
+
+      if (req.file) {
+        const result = await uploadToCloudinary(req.file.buffer, "categories");
+        image = result.url;
+        publicId = result.publicId;
+      }
+
+      const newCategory = new Category({
+        // adminId: req.user._id,
+        name,
+        image,
+        publicId,
+      });
+      await newCategory.save();
+
+      res.json({
+        success: true,
+        message: "Category created successfully.",
+        data: null,
+      });
+    });
+  }),
+);
 // router.post(
 //   '/',
 //   upload.single('img'),
@@ -264,45 +329,76 @@ router.post('/', auth, asyncHandler(async (req, res) => {
 // );
 
 // ─── UPDATE CATEGORY ──────────────────────────────────────────────────────────
-router.put('/:id', asyncHandler(async (req, res) => {
-    upload.single('img')(req, res, async (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') err.message = 'File size is too large. Maximum filesize is 5MB.';
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(400).json({ success: false, message: err.message });
+router.put(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Check permission (superAdmin only)
+    if (req.user.role !== "superAdmin") {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission. Admin access required.",
+      });
+    }
+    upload.single("img")(req, res, async (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE")
+          err.message = "File size is too large. Maximum filesize is 5MB.";
+        return res.status(400).json({ success: false, message: err.message });
+      } else if (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+
+      const category = await Category.findById(req.params.id);
+      if (!category) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Category not found." });
+      }
+
+      const { name } = req.body;
+
+      if (!name) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Name is required." });
+      }
+
+      category.name = name;
+
+      // If a new image was uploaded, delete old from Cloudinary and upload new
+      if (req.file) {
+        if (category.publicId) {
+          await cloudinary.uploader
+            .destroy(category.publicId)
+            .catch((e) =>
+              console.error(
+                `Cloudinary delete failed for ${category.publicId}:`,
+                e.message,
+              ),
+            );
         }
 
-        const category = await Category.findById(req.params.id);
-        if (!category) {
-            return res.status(404).json({ success: false, message: "Category not found." });
-        }
+        const result = await uploadToCloudinary(req.file.buffer, "categories");
+        category.image = result.url;
+        category.publicId = result.publicId;
+      }
 
-        const { name } = req.body;
-
-        if (!name) {
-            return res.status(400).json({ success: false, message: "Name is required." });
-        }
-
-        category.name = name;
-
-        // If a new image was uploaded, delete old from Cloudinary and upload new
-        if (req.file) {
-            if (category.publicId) {
-                await cloudinary.uploader.destroy(category.publicId).catch(e =>
-                    console.error(`Cloudinary delete failed for ${category.publicId}:`, e.message)
-                );
-            }
-
-            const result = await uploadToCloudinary(req.file.buffer, 'categories');
-            category.image    = result.url;
-            category.publicId = result.publicId;
-        }
-
-        await category.save();
-        res.json({ success: true, message: "Category updated successfully.", data: null });
+      await category.save();
+      res.json({
+        success: true,
+        message: "Category updated successfully.",
+        data: null,
+      });
     });
-}));
+  }),
+);
 // router.put(
 //   '/:id',
 //   upload.single('img'),
@@ -352,35 +448,73 @@ router.put('/:id', asyncHandler(async (req, res) => {
 // );
 
 // ─── DELETE CATEGORY ──────────────────────────────────────────────────────────
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Check permission (superAdmin only)
+    if (req.user.role !== "superAdmin") {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission. Admin access required.",
+      });
+    }
     const categoryID = req.params.id;
 
     // Block deletion if subcategories reference this category
     const subcategories = await SubCategory.find({ categoryId: categoryID });
     if (subcategories.length > 0) {
-        return res.status(400).json({ success: false, message: "Cannot delete category. Subcategories are referencing it." });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Cannot delete category. Subcategories are referencing it.",
+        });
     }
 
     // Block deletion if products reference this category
     const products = await Product.find({ proCategoryId: categoryID });
     if (products.length > 0) {
-        return res.status(400).json({ success: false, message: "Cannot delete category. Products are referencing it." });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Cannot delete category. Products are referencing it.",
+        });
     }
 
     const category = await Category.findById(categoryID);
     if (!category) {
-        return res.status(404).json({ success: false, message: "Category not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Category not found." });
     }
 
     // Delete image from Cloudinary
     if (category.publicId) {
-        await cloudinary.uploader.destroy(category.publicId).catch(e =>
-            console.error(`Cloudinary delete failed for ${category.publicId}:`, e.message)
+      await cloudinary.uploader
+        .destroy(category.publicId)
+        .catch((e) =>
+          console.error(
+            `Cloudinary delete failed for ${category.publicId}:`,
+            e.message,
+          ),
         );
     }
 
     await category.deleteOne();
-    res.json({ success: true, message: "Category deleted successfully.", data: null });
-}));
+    res.json({
+      success: true,
+      message: "Category deleted successfully.",
+      data: null,
+    });
+  }),
+);
 
 module.exports = router;

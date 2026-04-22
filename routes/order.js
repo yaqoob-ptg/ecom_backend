@@ -155,7 +155,7 @@ router.get('/orderByUserId/:userId', asyncHandler(async (req, res) => {
 }));
 
 // Get a single order by ID
-router.get('/:id', asyncHandler(async (req, res) => {
+router.get('/:id', asyncHandler( async (req, res) => {
     try {
         const order = await Order.findById(req.params.id)
             .populate('couponCode', 'id couponCode discountType discountAmount')

@@ -144,6 +144,7 @@ app.use('/products', require('./routes/product'));
 app.use('/couponCodes', require('./routes/couponCode'));
 app.use('/posters', require('./routes/poster'));
 app.use('/users', require('./routes/user'));
+app.use('/super-admin',require('./routes/superAdmin'));
 app.use('/orders', require('./routes/order'));
 app.use('/payment', require('./routes/payment'));
 app.use('/notification', require('./routes/notification'));
