@@ -3,7 +3,31 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const User = require("../model/user");
 const { verifySuperAdmin } = require("../middleware/superAdminMiddleware");
+const Order = require('../model/order');
 
+
+
+
+// Helper: build date filter from period string
+function buildDateFilter(period) {
+  const now   = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+ 
+  switch (period) {
+    case 'today':
+      return { $gte: today };
+    case 'week': {
+      const dayOfWeek = now.getDay() || 7; // Mon=1 … Sun=7
+      const monday    = new Date(today);
+      monday.setDate(today.getDate() - (dayOfWeek - 1));
+      return { $gte: monday };
+    }
+    case 'month':
+      return { $gte: new Date(now.getFullYear(), now.getMonth(), 1) };
+    default:
+      return undefined; // overall — no filter
+  }
+}
 // ============ PUBLIC SUPER ADMIN ROUTES (No auth required) ============
 
 // Super Admin Login (no auth needed)
@@ -225,6 +249,147 @@ router.get("/users/:id", async (req, res) => {
     res.json({ success: true, data: user });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+
+// ─── GET /super-admin/sales/summary ─────────────────────────────────────────
+// Returns overall KPI numbers for the chosen period
+router.get('/sales/summary', async (req, res) => {
+  try {
+    const { period = 'overall' } = req.query;
+    const dateFilter = buildDateFilter(period);
+    const match = dateFilter ? { orderDate: dateFilter } : {};
+ 
+    const [result] = await Order.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalRevenue:    { $sum: '$orderTotal.total' },
+          totalOrders:     { $sum: 1 },
+          pendingOrders:   { $sum: { $cond: [{ $eq: ['$orderStatus', 'pending']   }, 1, 0] } },
+          shippedOrders:   { $sum: { $cond: [{ $eq: ['$orderStatus', 'shipped']   }, 1, 0] } },
+          deliveredOrders: { $sum: { $cond: [{ $eq: ['$orderStatus', 'delivered'] }, 1, 0] } },
+          cancelledOrders: { $sum: { $cond: [{ $eq: ['$orderStatus', 'cancelled'] }, 1, 0] } },
+        },
+      },
+    ]);
+ 
+    // Today sub-query
+    const todayFilter = { orderDate: buildDateFilter('today') };
+    const [todayResult] = await Order.aggregate([
+      { $match: todayFilter },
+      { $group: { _id: null, todayRevenue: { $sum: '$orderTotal.total' }, todayOrders: { $sum: 1 } } },
+    ]);
+ 
+    res.json({
+      success: true,
+      data: {
+        ...( result || {
+          totalRevenue: 0, totalOrders: 0,
+          pendingOrders: 0, shippedOrders: 0,
+          deliveredOrders: 0, cancelledOrders: 0,
+        }),
+        todayRevenue: todayResult?.todayRevenue ?? 0,
+        todayOrders:  todayResult?.todayOrders  ?? 0,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+ 
+// ─── GET /super-admin/sales/by-admin ────────────────────────────────────────
+// Sales totals grouped by admin, with status breakdown
+router.get('/sales/by-admin', async (req, res) => {
+  try {
+    const { period = 'overall' } = req.query;
+    const dateFilter = buildDateFilter(period);
+    const match = dateFilter ? { orderDate: dateFilter } : {};
+ 
+    const rows = await Order.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$adminId',
+          totalSales:     { $sum: '$orderTotal.total' },
+          orderCount:     { $sum: 1 },
+          pendingOrders:  { $sum: { $cond: [{ $eq: ['$orderStatus', 'pending']   }, 1, 0] } },
+          shippedOrders:  { $sum: { $cond: [{ $eq: ['$orderStatus', 'shipped']   }, 1, 0] } },
+          deliveredOrders:{ $sum: { $cond: [{ $eq: ['$orderStatus', 'delivered'] }, 1, 0] } },
+          cancelledOrders:{ $sum: { $cond: [{ $eq: ['$orderStatus', 'cancelled'] }, 1, 0] } },
+        },
+      },
+      { $sort: { totalSales: -1 } },
+    ]);
+ 
+    // Enrich with admin name/email
+    const adminIds = rows.map(r => r._id).filter(Boolean);
+    const admins   = await User.find({ _id: { $in: adminIds } }).select('name email');
+    const adminMap = Object.fromEntries(admins.map(a => [a._id.toString(), a]));
+ 
+    const data = rows.map(r => ({
+      adminId:        r._id?.toString() ?? 'unknown',
+      adminName:      adminMap[r._id?.toString()]?.name  ?? 'Unknown Admin',
+      adminEmail:     adminMap[r._id?.toString()]?.email ?? '',
+      totalSales:     r.totalSales,
+      orderCount:     r.orderCount,
+      pendingOrders:  r.pendingOrders,
+      shippedOrders:  r.shippedOrders,
+      deliveredOrders:r.deliveredOrders,
+      cancelledOrders:r.cancelledOrders,
+    }));
+ 
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+ 
+// ─── GET /super-admin/sales/by-product ──────────────────────────────────────
+// Sales totals grouped by product, with admin name
+router.get('/sales/by-product', async (req, res) => {
+  try {
+    const { period = 'overall', limit = 50 } = req.query;
+    const dateFilter = buildDateFilter(period);
+    const match = dateFilter ? { orderDate: dateFilter } : {};
+ 
+    const rows = await Order.aggregate([
+      { $match: match },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: {
+            productId:   '$items.productID',
+            productName: '$items.productName',
+            adminId:     '$adminId',
+          },
+          totalQuantity: { $sum: '$items.quantity' },
+          totalRevenue:  { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+          orderCount:    { $sum: 1 },
+        },
+      },
+      { $sort: { totalQuantity: -1 } },
+      { $limit: parseInt(limit) },
+    ]);
+ 
+    const adminIds = [...new Set(rows.map(r => r._id.adminId?.toString()).filter(Boolean))];
+    const admins   = await User.find({ _id: { $in: adminIds } }).select('name');
+    const adminMap = Object.fromEntries(admins.map(a => [a._id.toString(), a.name]));
+ 
+    const data = rows.map(r => ({
+      productId:     r._id.productId?.toString() ?? '',
+      productName:   r._id.productName ?? 'Unknown',
+      adminName:     adminMap[r._id.adminId?.toString()] ?? 'Unknown Admin',
+      totalQuantity: r.totalQuantity,
+      totalRevenue:  r.totalRevenue,
+      orderCount:    r.orderCount,
+    }));
+ 
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

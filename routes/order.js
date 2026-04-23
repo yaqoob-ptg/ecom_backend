@@ -131,6 +131,7 @@ router.get('/', asyncHandler(async (req, res) => {
         const orders = await Order.find(filter)
             .populate('couponCode', 'id couponCode discountType discountAmount')
             .populate('userID', 'id name')
+            .populate('adminId', 'name email') 
             .sort({ _id: -1 });
 
         res.json({ success: true, message: "Orders retrieved successfully.", data: orders });
