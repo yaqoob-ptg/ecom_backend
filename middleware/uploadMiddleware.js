@@ -56,19 +56,20 @@ const limits = { fileSize: 4 * 1024 * 1024 }; // 4MB
 // One multer instance — reuse for products, categories, posters
 const upload = multer({ storage, fileFilter, limits });
 
-/**
- * Uploads a single buffer to Cloudinary.
- * @param {Buffer} buffer   - file buffer from multer memoryStorage
- * @param {string} folder   - Cloudinary folder name e.g. 'products'
- * @param {object} options  - extra Cloudinary upload options (optional)
- * @returns {{ url, publicId }}
- */
+// /**
+//  * Uploads a single buffer to Cloudinary.
+//  * @param {Buffer} buffer   - file buffer from multer memoryStorage
+//  * @param {string} folder   - Cloudinary folder name e.g. 'products'
+//  * @param {object} options  - extra Cloudinary upload options (optional)
+//  * @returns {{ url, publicId }}
+//  */
 const uploadToCloudinary = (buffer, folder, options = {}) => {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
             {
                 folder,
                 resource_type: 'image',
+                timeout: 60000, // Set timeout to 60 seconds
                 ...options,
             },
             (error, result) => {
@@ -79,6 +80,11 @@ const uploadToCloudinary = (buffer, folder, options = {}) => {
                 resolve({ url: result.secure_url, publicId: result.public_id });
             }
         );
+        stream.on('error', (err) => {
+            console.error("Stream Error:", err);
+            reject(err);
+        });
+        
         stream.end(buffer);
     });
 };

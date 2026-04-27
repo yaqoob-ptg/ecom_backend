@@ -226,65 +226,122 @@ router.get(
 );
 
 // ─── CREATE CATEGORY ──────────────────────────────────────────────────────────
+// router.post(
+//   "/",
+//   asyncHandler(async (req, res) => {
+//     if (!req.user) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Authentication required",
+//       });
+//     }
+
+//     // Check permission (superAdmin only)
+//     if (req.user.role !== "superAdmin") {
+//       return res.status(403).json({
+//         success: false,
+//         message: "You don't have permission. Admin access required.",
+//       });
+//     }
+//     upload.single("img")(req, res, async (err) => {
+//       if (err instanceof multer.MulterError) {
+//         if (err.code === "LIMIT_FILE_SIZE")
+//           err.message = "File size is too large. Maximum filesize is 5MB.";
+//         return res.status(400).json({ success: false, message: err.message });
+//       } else if (err) {
+//         return res.status(500).json({ success: false, message: err.message });
+//       }
+
+//       const { name } = req.body;
+
+//       if (!name) {
+//         return res
+//           .status(400)
+//           .json({ success: false, message: "Name is required." });
+//       }
+
+//       // Upload image to Cloudinary
+//       let image = "no_url";
+//       let publicId = null;
+
+//       if (req.file) {
+//         const result = await uploadToCloudinary(req.file.buffer, "categories");
+//         image = result.url;
+//         publicId = result.publicId;
+//       }
+
+//       const newCategory = new Category({
+//         // adminId: req.user._id,
+//         name,
+//         image,
+//         publicId,
+//       });
+//       await newCategory.save();
+
+//       res.json({
+//         success: true,
+//         message: "Category created successfully.",
+//         data: null,
+//       });
+//     });
+//   }),
+// );
 router.post(
   "/",
-  asyncHandler(async (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+  asyncHandler(async (req, res, next) => {
+    // 1. Permission Check
+    if (!req.user || req.user.role !== "superAdmin") {
+      return res.status(403).json({ success: false, message: "Admin access required." });
     }
 
-    // Check permission (superAdmin only)
-    if (req.user.role !== "superAdmin") {
-      return res.status(403).json({
-        success: false,
-        message: "You don't have permission. Admin access required.",
-      });
-    }
+    // 2. Handle Multer
     upload.single("img")(req, res, async (err) => {
-      if (err instanceof multer.MulterError) {
-        if (err.code === "LIMIT_FILE_SIZE")
-          err.message = "File size is too large. Maximum filesize is 5MB.";
-        return res.status(400).json({ success: false, message: err.message });
-      } else if (err) {
-        return res.status(500).json({ success: false, message: err.message });
+      if (err) {
+        return res.status(400).json({ 
+          success: false, 
+          message: err.code === "LIMIT_FILE_SIZE" ? "File too large (Max 5MB)" : err.message 
+        });
       }
 
       const { name } = req.body;
-
       if (!name) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Name is required." });
+        return res.status(400).json({ success: false, message: "Name is required." });
       }
 
-      // Upload image to Cloudinary
       let image = "no_url";
       let publicId = null;
 
+      // 3. Handle Cloudinary with explicit Try/Catch
       if (req.file) {
-        const result = await uploadToCloudinary(req.file.buffer, "categories");
-        image = result.url;
-        publicId = result.publicId;
+        try {
+          const result = await uploadToCloudinary(req.file.buffer, "categories");
+          image = result.url;
+          publicId = result.publicId;
+        } catch (uploadError) {
+          console.error("Cloudinary Error Detail:", uploadError);
+          
+          // CRITICAL: This sends the response to frontend when Cloudinary times out
+          return res.status(400).json({ 
+            success: false, 
+            message: "Cloudinary upload timed out. Please try a smaller image or check your connection." 
+          });
+        }
       }
 
-      const newCategory = new Category({
-        // adminId: req.user._id,
-        name,
-        image,
-        publicId,
-      });
-      await newCategory.save();
+      // 4. Save to Database
+      try {
+        const newCategory = new Category({ name, image, publicId });
+        await newCategory.save();
 
-      res.json({
-        success: true,
-        message: "Category created successfully.",
-        data: null,
-      });
+        return res.json({
+          success: true,
+          message: "Category created successfully.",
+        });
+      } catch (dbError) {
+        return res.status(500).json({ success: false, message: "Database save failed." });
+      }
     });
-  }),
+  })
 );
 // router.post(
 //   '/',
@@ -328,76 +385,116 @@ router.post(
 //   })
 // );
 
+// // ─── UPDATE CATEGORY ──────────────────────────────────────────────────────────
+// router.put(
+//   "/:id",
+//   asyncHandler(async (req, res) => {
+//     if (!req.user) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Authentication required",
+//       });
+//     }
+
+//     // Check permission (superAdmin only)
+//     if (req.user.role !== "superAdmin") {
+//       return res.status(403).json({
+//         success: false,
+//         message: "You don't have permission. Admin access required.",
+//       });
+//     }
+//     upload.single("img")(req, res, async (err) => {
+//       if (err instanceof multer.MulterError) {
+//         if (err.code === "LIMIT_FILE_SIZE")
+//           err.message = "File size is too large. Maximum filesize is 5MB.";
+//         return res.status(400).json({ success: false, message: err.message });
+//       } else if (err) {
+//         return res.status(400).json({ success: false, message: err.message });
+//       }
+
+//       const category = await Category.findById(req.params.id);
+//       if (!category) {
+//         return res
+//           .status(404)
+//           .json({ success: false, message: "Category not found." });
+//       }
+
+//       const { name } = req.body;
+
+//       if (!name) {
+//         return res
+//           .status(400)
+//           .json({ success: false, message: "Name is required." });
+//       }
+
+//       category.name = name;
+
+//       // If a new image was uploaded, delete old from Cloudinary and upload new
+//       if (req.file) {
+//         if (category.publicId) {
+//           await cloudinary.uploader
+//             .destroy(category.publicId)
+//             .catch((e) =>
+//               console.error(
+//                 `Cloudinary delete failed for ${category.publicId}:`,
+//                 e.message,
+//               ),
+//             );
+//         }
+
+//         const result = await uploadToCloudinary(req.file.buffer, "categories");
+//         category.image = result.url;
+//         category.publicId = result.publicId;
+//       }
+
+//       await category.save();
+//       res.json({
+//         success: true,
+//         message: "Category updated successfully.",
+//         data: null,
+//       });
+//     });
+//   }),
+// );
 // ─── UPDATE CATEGORY ──────────────────────────────────────────────────────────
 router.put(
   "/:id",
   asyncHandler(async (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+    if (!req.user || req.user.role !== "superAdmin") {
+      return res.status(403).json({ success: false, message: "Unauthorized access." });
     }
 
-    // Check permission (superAdmin only)
-    if (req.user.role !== "superAdmin") {
-      return res.status(403).json({
-        success: false,
-        message: "You don't have permission. Admin access required.",
-      });
-    }
     upload.single("img")(req, res, async (err) => {
-      if (err instanceof multer.MulterError) {
-        if (err.code === "LIMIT_FILE_SIZE")
-          err.message = "File size is too large. Maximum filesize is 5MB.";
-        return res.status(400).json({ success: false, message: err.message });
-      } else if (err) {
-        return res.status(400).json({ success: false, message: err.message });
-      }
+      if (err) return res.status(400).json({ success: false, message: err.message });
 
-      const category = await Category.findById(req.params.id);
-      if (!category) {
-        return res
-          .status(404)
-          .json({ success: false, message: "Category not found." });
-      }
+      try {
+        const category = await Category.findById(req.params.id);
+        if (!category) return res.status(404).json({ success: false, message: "Not found." });
 
-      const { name } = req.body;
+        const { name } = req.body;
+        if (name) category.name = name;
 
-      if (!name) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Name is required." });
-      }
-
-      category.name = name;
-
-      // If a new image was uploaded, delete old from Cloudinary and upload new
-      if (req.file) {
-        if (category.publicId) {
-          await cloudinary.uploader
-            .destroy(category.publicId)
-            .catch((e) =>
-              console.error(
-                `Cloudinary delete failed for ${category.publicId}:`,
-                e.message,
-              ),
-            );
+        if (req.file) {
+          // Attempt Cloudinary upload
+          try {
+            if (category.publicId) {
+              await cloudinary.uploader.destroy(category.publicId).catch(() => {});
+            }
+            const result = await uploadToCloudinary(req.file.buffer, "categories");
+            category.image = result.url;
+            category.publicId = result.publicId;
+          } catch (cloudErr) {
+            return res.status(400).json({ success: false, message: "Image upload timed out." });
+          }
         }
 
-        const result = await uploadToCloudinary(req.file.buffer, "categories");
-        category.image = result.url;
-        category.publicId = result.publicId;
+        await category.save();
+        res.json({ success: true, message: "Category updated successfully." });
+      } catch (dbError) {
+        res.status(500).json({ success: false, message: "Internal Server Error" });
       }
-
-      await category.save();
-      res.json({
-        success: true,
-        message: "Category updated successfully.",
-        data: null,
-      });
     });
-  }),
+  })
 );
 // router.put(
 //   '/:id',

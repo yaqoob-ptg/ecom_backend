@@ -712,18 +712,18 @@ router.post(
   asyncHandler(async (req, res) => {
     const { name, email, phone, password, role, location } = req.body;
 
-    if (!name || !email || !phone || !password || !location) {
+    if (!name || !email || !phone || !password) {
       return res.status(400).json({
         success: false,
         message: "Name, email, phone, location, and password are required.",
       });
     }
-    if (!location || location.trim() === "") {
-      return res.status(400).json({
-        success: false,
-        message: "Location is required",
-      });
-    }
+    // if (!location || location.trim() === "") {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Location is required",
+    //   });
+    // }
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res
@@ -739,7 +739,7 @@ router.post(
       name,
       email,
       phone,
-      location,
+      location: location || "",
       password: hashedPassword,
       role: role || "user",
       verificationToken,
@@ -792,18 +792,18 @@ router.post(
         message: "Access Denied: You do not have administrative privileges.",
       });
     }
-if (user.role === 'admin' && !user.isApproved) {
-  return res.status(403).json({
-    success: false,
-    message: "Your admin account is pending approval by the super admin.",
-  });
-}
-if (!user.isActive) {
-  return res.status(403).json({
-    success: false,
-    message: "Your account has been deactivated. Please contact support.",
-  });
-}
+    if (user.role === "admin" && !user.isApproved) {
+      return res.status(403).json({
+        success: false,
+        message: "Your admin account is pending approval by the super admin.",
+      });
+    }
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been deactivated. Please contact support.",
+      });
+    }
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res
@@ -822,7 +822,7 @@ if (!user.isActive) {
     const accessToken = jwt.sign(
       { _id: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "20m" },
+      { expiresIn: "15m" },
     );
 
     const refreshToken = jwt.sign(
