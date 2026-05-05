@@ -187,6 +187,7 @@ const router = express.Router();
 const multer = require("multer");
 const Product = require("../model/product");
 const cloudinary = require("../config/cloudinary");
+    const Order = require("../model/order"); 
 const {
   upload,
   uploadToCloudinary,
@@ -249,7 +250,66 @@ router.get(
   }),
 );
 
-// ─── CREATE ──────────────────────────────────────────────────────────────────
+// ─── GET TRENDING (most ordered in last 7 days) ──────────────────────────────
+router.get(
+  "/trending/week",
+  auth,
+  asyncHandler(async (req, res) => {
+
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // 1. Aggregate orders from the past 7 days → count per productID
+    const trendingAgg = await Order.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: "$items.productID",
+          orderCount: { $sum: "$items.quantity" },
+        },
+      },
+      { $sort: { orderCount: -1 } },
+      { $limit: 20 },
+    ]);
+
+    if (trendingAgg.length === 0) {
+      return res.json({
+        success: true,
+        message: "No trending products this week.",
+        data: [],
+      });
+    }
+
+    // 2. Fetch full product details for those IDs
+    const mongoose = require("mongoose");
+    const ids = trendingAgg.map((t) => new mongoose.Types.ObjectId(t._id));
+
+    const products = await Product.find({ _id: { $in: ids } })
+      .populate("proCategoryId", "id name")
+      .populate("proSubCategoryId", "id name")
+      .populate("proBrandId", "id name")
+      .populate("proVariantTypeId", "id type")
+      .populate("adminId", "name");
+
+    // 3. Re-sort products to match the aggregation order (highest first)
+    const orderMap = Object.fromEntries(
+      trendingAgg.map((t) => [t._id.toString(), t.orderCount])
+    );
+    products.sort(
+      (a, b) =>
+        (orderMap[b._id.toString()] ?? 0) - (orderMap[a._id.toString()] ?? 0)
+    );
+
+    res.json({
+      success: true,
+      message: "Trending products retrieved successfully.",
+      data: products,
+    });
+  })
+);
+
 // ─── CREATE ──────────────────────────────────────────────────────────────────
 router.post(
   "/",
@@ -797,3 +857,5 @@ router.delete(
 );
 
 module.exports = router;
+
+
