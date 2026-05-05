@@ -299,7 +299,7 @@ router.post(
       if (err) {
         return res.status(400).json({ 
           success: false, 
-          message: err.code === "LIMIT_FILE_SIZE" ? "File too large (Max 5MB)" : err.message 
+          message: err.code === "LIMIT_FILE_SIZE" ? "File too large (Max 4MB)" : err.message 
         });
       }
 
@@ -311,19 +311,21 @@ router.post(
       let image = "no_url";
       let publicId = null;
 
-      // 3. Handle Cloudinary with explicit Try/Catch
+      // 3. Handle Cloudinary - now gets bgRemovedUrl directly
       if (req.file) {
         try {
           const result = await uploadToCloudinary(req.file.buffer, "categories");
-          image = result.url;
+          
+          // Use the background-removed URL
+          image = result.bgRemovedUrl;  // This is the background-removed PNG URL
           publicId = result.publicId;
+          
         } catch (uploadError) {
           console.error("Cloudinary Error Detail:", uploadError);
           
-          // CRITICAL: This sends the response to frontend when Cloudinary times out
           return res.status(400).json({ 
             success: false, 
-            message: "Cloudinary upload timed out. Please try a smaller image or check your connection." 
+            message: "Image upload failed. Please try a smaller image or check your connection." 
           });
         }
       }
@@ -336,13 +338,76 @@ router.post(
         return res.json({
           success: true,
           message: "Category created successfully.",
+          data: newCategory
         });
       } catch (dbError) {
+        // Clean up if database save fails
+        if (publicId) {
+          await cloudinary.uploader.destroy(publicId).catch(console.error);
+        }
+        
         return res.status(500).json({ success: false, message: "Database save failed." });
       }
     });
   })
 );
+// router.post(
+//   "/",
+//   asyncHandler(async (req, res, next) => {
+//     // 1. Permission Check
+//     if (!req.user || req.user.role !== "superAdmin") {
+//       return res.status(403).json({ success: false, message: "Admin access required." });
+//     }
+
+//     // 2. Handle Multer
+//     upload.single("img")(req, res, async (err) => {
+//       if (err) {
+//         return res.status(400).json({ 
+//           success: false, 
+//           message: err.code === "LIMIT_FILE_SIZE" ? "File too large (Max 5MB)" : err.message 
+//         });
+//       }
+
+//       const { name } = req.body;
+//       if (!name) {
+//         return res.status(400).json({ success: false, message: "Name is required." });
+//       }
+
+//       let image = "no_url";
+//       let publicId = null;
+
+//       // 3. Handle Cloudinary with explicit Try/Catch
+//       if (req.file) {
+//         try {
+//           const result = await uploadToCloudinary(req.file.buffer, "categories");
+//           image = result.url;
+//           publicId = result.publicId;
+//         } catch (uploadError) {
+//           console.error("Cloudinary Error Detail:", uploadError);
+          
+//           // CRITICAL: This sends the response to frontend when Cloudinary times out
+//           return res.status(400).json({ 
+//             success: false, 
+//             message: "Cloudinary upload timed out. Please try a smaller image or check your connection." 
+//           });
+//         }
+//       }
+
+//       // 4. Save to Database
+//       try {
+//         const newCategory = new Category({ name, image, publicId });
+//         await newCategory.save();
+
+//         return res.json({
+//           success: true,
+//           message: "Category created successfully.",
+//         });
+//       } catch (dbError) {
+//         return res.status(500).json({ success: false, message: "Database save failed." });
+//       }
+//     });
+//   })
+// );
 // router.post(
 //   '/',
 //   upload.single('img'),
@@ -477,25 +542,82 @@ router.put(
         if (req.file) {
           // Attempt Cloudinary upload
           try {
+            // Delete old image if exists
             if (category.publicId) {
-              await cloudinary.uploader.destroy(category.publicId).catch(() => {});
+              await cloudinary.uploader.destroy(category.publicId).catch((e) => {
+                console.error(`Failed to delete old image: ${e.message}`);
+              });
             }
+            
             const result = await uploadToCloudinary(req.file.buffer, "categories");
-            category.image = result.url;
+            
+            // Use background-removed PNG URL
+            category.image = result.bgRemovedUrl;  // Background-removed PNG
+            category.originalUrl = result.url;      // Original as fallback
             category.publicId = result.publicId;
+            
           } catch (cloudErr) {
-            return res.status(400).json({ success: false, message: "Image upload timed out." });
+            console.error("Cloudinary upload failed:", cloudErr);
+            return res.status(400).json({ 
+              success: false, 
+              message: "Image upload timed out. Please try again." 
+            });
           }
         }
 
         await category.save();
-        res.json({ success: true, message: "Category updated successfully." });
+        res.json({ 
+          success: true, 
+          message: "Category updated successfully.",
+          data: category 
+        });
+        
       } catch (dbError) {
+        console.error("Database error:", dbError);
         res.status(500).json({ success: false, message: "Internal Server Error" });
       }
     });
   })
 );
+// router.put(
+//   "/:id",
+//   asyncHandler(async (req, res) => {
+//     if (!req.user || req.user.role !== "superAdmin") {
+//       return res.status(403).json({ success: false, message: "Unauthorized access." });
+//     }
+
+//     upload.single("img")(req, res, async (err) => {
+//       if (err) return res.status(400).json({ success: false, message: err.message });
+
+//       try {
+//         const category = await Category.findById(req.params.id);
+//         if (!category) return res.status(404).json({ success: false, message: "Not found." });
+
+//         const { name } = req.body;
+//         if (name) category.name = name;
+
+//         if (req.file) {
+//           // Attempt Cloudinary upload
+//           try {
+//             if (category.publicId) {
+//               await cloudinary.uploader.destroy(category.publicId).catch(() => {});
+//             }
+//             const result = await uploadToCloudinary(req.file.buffer, "categories");
+//             category.image = result.url;
+//             category.publicId = result.publicId;
+//           } catch (cloudErr) {
+//             return res.status(400).json({ success: false, message: "Image upload timed out." });
+//           }
+//         }
+
+//         await category.save();
+//         res.json({ success: true, message: "Category updated successfully." });
+//       } catch (dbError) {
+//         res.status(500).json({ success: false, message: "Internal Server Error" });
+//       }
+//     });
+//   })
+// );
 // router.put(
 //   '/:id',
 //   upload.single('img'),

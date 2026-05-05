@@ -250,6 +250,7 @@ router.get(
 );
 
 // ─── CREATE ──────────────────────────────────────────────────────────────────
+// ─── CREATE ──────────────────────────────────────────────────────────────────
 router.post(
   "/",
   auth,
@@ -257,7 +258,7 @@ router.post(
     upload.fields(multerFields)(req, res, async (err) => {
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE")
-          err.message = "File size too large. Max 5MB per image.";
+          err.message = "File size too large. Max 4MB per image.";
         return res.status(400).json({ success: false, message: err.message });
       } else if (err) {
         return res.status(500).json({ success: false, message: err.message });
@@ -284,41 +285,155 @@ router.post(
 
       // Upload each image buffer to Cloudinary
       const imageUrls = [];
+      const uploadErrors = [];
+      
       for (let i = 0; i < IMAGE_FIELDS.length; i++) {
         const field = IMAGE_FIELDS[i];
         if (req.files?.[field]?.[0]) {
-          const { url, publicId } = await uploadToCloudinary(
-            req.files[field][0].buffer,
-            "products",
-          );
-          imageUrls.push({ image: i + 1, url, publicId });
+          try {
+            // Your uploadToCloudinary now returns bgRemovedUrl directly!
+            const result = await uploadToCloudinary(
+              req.files[field][0].buffer,
+              "products"
+            );
+            
+            // Use bgRemovedUrl as the main image URL
+            imageUrls.push({ 
+              image: i + 1, 
+              url: result.bgRemovedUrl,      // Background-removed PNG URL
+              originalUrl: result.url,        // Original URL as fallback
+              publicId: result.publicId 
+            });
+            
+          } catch (uploadError) {
+            console.error(`Failed to upload image ${i + 1}:`, uploadError);
+            uploadErrors.push(`Image ${i + 1}: ${uploadError.message}`);
+          }
         }
       }
 
-      const newProduct = new Product({
-        adminId: req.user._id,
-        name,
-        description,
-        quantity,
-        price,
-        offerPrice,
-        proCategoryId,
-        proSubCategoryId,
-        proBrandId,
-        proVariantTypeId,
-        proVariantId,
-        images: imageUrls,
-      });
+      if (imageUrls.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No images were uploaded successfully",
+          errors: uploadErrors
+        });
+      }
 
-      await newProduct.save();
-      res.json({
-        success: true,
-        message: "Product created successfully.",
-        data: newProduct,
-      });
+      try {
+        const newProduct = new Product({
+          adminId: req.user._id,
+          name,
+          description,
+          quantity,
+          price,
+          offerPrice,
+          proCategoryId,
+          proSubCategoryId,
+          proBrandId,
+          proVariantTypeId,
+          proVariantId,
+          images: imageUrls,
+        });
+
+        await newProduct.save();
+        
+        res.json({
+          success: true,
+          message: "Product created successfully.",
+          data: newProduct,
+          warnings: uploadErrors.length > 0 ? uploadErrors : undefined
+        });
+        
+      } catch (dbError) {
+        console.error("Database save failed:", dbError);
+        
+        // Clean up uploaded images
+        const cleanupPromises = imageUrls.map(img => 
+          cloudinary.uploader.destroy(img.publicId).catch(err => 
+            console.error(`Failed to delete ${img.publicId}:`, err)
+          )
+        );
+        await Promise.allSettled(cleanupPromises);
+        
+        return res.status(500).json({
+          success: false,
+          message: "Failed to save product to database. Uploaded images cleaned up.",
+          error: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+        });
+      }
     });
   }),
 );
+// router.post(
+//   "/",
+//   auth,
+//   asyncHandler(async (req, res) => {
+//     upload.fields(multerFields)(req, res, async (err) => {
+//       if (err instanceof multer.MulterError) {
+//         if (err.code === "LIMIT_FILE_SIZE")
+//           err.message = "File size too large. Max 5MB per image.";
+//         return res.status(400).json({ success: false, message: err.message });
+//       } else if (err) {
+//         return res.status(500).json({ success: false, message: err.message });
+//       }
+
+//       const {
+//         name,
+//         description,
+//         quantity,
+//         price,
+//         offerPrice,
+//         proCategoryId,
+//         proSubCategoryId,
+//         proBrandId,
+//         proVariantTypeId,
+//         proVariantId,
+//       } = req.body;
+
+//       if (!name || !quantity || !price || !proCategoryId || !proSubCategoryId) {
+//         return res
+//           .status(400)
+//           .json({ success: false, message: "Required fields are missing." });
+//       }
+
+//       // Upload each image buffer to Cloudinary
+//       const imageUrls = [];
+//       for (let i = 0; i < IMAGE_FIELDS.length; i++) {
+//         const field = IMAGE_FIELDS[i];
+//         if (req.files?.[field]?.[0]) {
+//           const { url, publicId } = await uploadToCloudinary(
+//             req.files[field][0].buffer,
+//             "products",
+//           );
+//           imageUrls.push({ image: i + 1, url, publicId });
+//         }
+//       }
+
+//       const newProduct = new Product({
+//         adminId: req.user._id,
+//         name,
+//         description,
+//         quantity,
+//         price,
+//         offerPrice,
+//         proCategoryId,
+//         proSubCategoryId,
+//         proBrandId,
+//         proVariantTypeId,
+//         proVariantId,
+//         images: imageUrls,
+//       });
+
+//       await newProduct.save();
+//       res.json({
+//         success: true,
+//         message: "Product created successfully.",
+//         data: newProduct,
+//       });
+//     });
+//   }),
+// );
 // router.post(
 //   '/',
 //   upload.fields(multerFields),
@@ -383,13 +498,14 @@ router.post(
 // );
 
 // ─── UPDATE ──────────────────────────────────────────────────────────────────
+// ─── UPDATE ──────────────────────────────────────────────────────────────────
 router.put(
   "/:id",
   asyncHandler(async (req, res) => {
     upload.fields(multerFields)(req, res, async (err) => {
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE")
-          err.message = "File size too large. Max 5MB per image.";
+          err.message = "File size too large. Max 4MB per image.";
         return res.status(400).json({ success: false, message: err.message });
       } else if (err) {
         return res.status(500).json({ success: false, message: err.message });
@@ -419,6 +535,8 @@ router.put(
         if (req.body[f] !== undefined) product[f] = req.body[f];
       });
 
+      const newPublicIds = [];
+
       // Update images — delete old from Cloudinary, upload new
       for (let i = 0; i < IMAGE_FIELDS.length; i++) {
         const field = IMAGE_FIELDS[i];
@@ -441,30 +559,136 @@ router.put(
               );
           }
 
-          // Upload new image
-          const { url, publicId } = await uploadToCloudinary(
+          // Upload new image - gets bgRemovedUrl directly
+          const result = await uploadToCloudinary(
             req.files[field][0].buffer,
             "products",
           );
+          
+          newPublicIds.push(result.publicId);
 
+          // Use background-removed URL
           if (existing) {
-            existing.url = url;
-            existing.publicId = publicId;
+            existing.url = result.bgRemovedUrl;        // Background-removed PNG
+            existing.originalUrl = result.url;          // Original as fallback
+            existing.publicId = result.publicId;
           } else {
-            product.images.push({ image: slotNumber, url, publicId });
+            product.images.push({ 
+              image: slotNumber, 
+              url: result.bgRemovedUrl,                // Background-removed PNG
+              originalUrl: result.url,                  // Original as fallback
+              publicId: result.publicId 
+            });
           }
         }
       }
 
-      await product.save();
-      res.json({
-        success: true,
-        message: "Product updated successfully.",
-        data: product,
-      });
+      try {
+        await product.save();
+        res.json({
+          success: true,
+          message: "Product updated successfully.",
+          data: product,
+        });
+      } catch (saveError) {
+        // Rollback: Delete newly uploaded images
+        const rollbackPromises = newPublicIds.map(publicId =>
+          cloudinary.uploader.destroy(publicId).catch(err =>
+            console.error(`Rollback failed for ${publicId}:`, err)
+          )
+        );
+        await Promise.allSettled(rollbackPromises);
+        
+        return res.status(500).json({
+          success: false,
+          message: "Failed to save product changes.",
+        });
+      }
     });
   }),
 );
+// router.put(
+//   "/:id",
+//   asyncHandler(async (req, res) => {
+//     upload.fields(multerFields)(req, res, async (err) => {
+//       if (err instanceof multer.MulterError) {
+//         if (err.code === "LIMIT_FILE_SIZE")
+//           err.message = "File size too large. Max 5MB per image.";
+//         return res.status(400).json({ success: false, message: err.message });
+//       } else if (err) {
+//         return res.status(500).json({ success: false, message: err.message });
+//       }
+
+//       const product = await Product.findById(req.params.id);
+//       if (!product) {
+//         return res
+//           .status(404)
+//           .json({ success: false, message: "Product not found." });
+//       }
+
+//       // Update text fields
+//       const fields = [
+//         "name",
+//         "description",
+//         "quantity",
+//         "price",
+//         "offerPrice",
+//         "proCategoryId",
+//         "proSubCategoryId",
+//         "proBrandId",
+//         "proVariantTypeId",
+//         "proVariantId",
+//       ];
+//       fields.forEach((f) => {
+//         if (req.body[f] !== undefined) product[f] = req.body[f];
+//       });
+
+//       // Update images — delete old from Cloudinary, upload new
+//       for (let i = 0; i < IMAGE_FIELDS.length; i++) {
+//         const field = IMAGE_FIELDS[i];
+//         const slotNumber = i + 1;
+
+//         if (req.files?.[field]?.[0]) {
+//           const existing = product.images.find(
+//             (img) => img.image === slotNumber,
+//           );
+
+//           // Delete old image from Cloudinary
+//           if (existing?.publicId) {
+//             await cloudinary.uploader
+//               .destroy(existing.publicId)
+//               .catch((e) =>
+//                 console.error(
+//                   `Cloudinary delete failed for ${existing.publicId}:`,
+//                   e.message,
+//                 ),
+//               );
+//           }
+
+//           // Upload new image
+//           const { url, publicId } = await uploadToCloudinary(
+//             req.files[field][0].buffer,
+//             "products",
+//           );
+
+//           if (existing) {
+//             existing.url = url;
+//             existing.publicId = publicId;
+//           } else {
+//             product.images.push({ image: slotNumber, url, publicId });
+//           }
+//         }
+//       }
+
+//       await product.save();
+//       res.json({
+//         success: true,
+//         message: "Product updated successfully.",
+//         data: product,
+//       });
+//     });
+//   }),
+// );
 // router.put(
 //   '/:id',
 //   upload.fields(multerFields),

@@ -1,46 +1,106 @@
-// const multer = require('multer');
-// const { productStorage, categoryStorage, posterStorage } = require('../config/cloudinary');
+// // const multer = require('multer');
+// // const { productStorage, categoryStorage, posterStorage } = require('../config/cloudinary');
+
+// // const fileFilter = (req, file, cb) => {
+// //   const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+// //   if (allowed.includes(file.mimetype)) {
+// //     cb(null, true);
+// //   } else {
+// //     cb(new Error('Only JPG, PNG, and WEBP images are allowed'), false);
+// //   }
+// // };
+
+// // const limits = { fileSize: 5 * 1024 * 1024 }; // 5MB
+
+// // const uploadProduct = multer({ storage: productStorage, fileFilter, limits });
+// // const uploadCategory = multer({ storage: categoryStorage, fileFilter, limits });
+// // const uploadPoster   = multer({ storage: posterStorage,   fileFilter, limits });
+
+// // module.exports = { uploadProduct, uploadCategory, uploadPoster };
+
+
+// const multer  = require('multer');
+// const cloudinary = require('../config/cloudinary');
+// const path = require('path');
+
+// // Use memory storage — no disk writes, buffer goes straight to Cloudinary
+// const storage = multer.memoryStorage();
+
+// // const fileFilter = (req, file, cb) => {
+// //      console.log("UPLOAD MIME TYPE:", file.mimetype);
+// //     console.log("UPLOAD ORIGINAL NAME:", file.originalname);
+// //     const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+// //     if (allowed.includes(file.mimetype)) {
+// //         cb(null, true);
+// //     } else {
+// //         cb(new Error('Only JPG, PNG, and WEBP images are allowed'), false);
+// //     }
+// // };
+
 
 // const fileFilter = (req, file, cb) => {
-//   const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-//   if (allowed.includes(file.mimetype)) {
-//     cb(null, true);
-//   } else {
-//     cb(new Error('Only JPG, PNG, and WEBP images are allowed'), false);
-//   }
-// };
+//     const allowedMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
-// const limits = { fileSize: 5 * 1024 * 1024 }; // 5MB
+//     const ext = path.extname(file.originalname).toLowerCase();
+//     const allowedExt = ['.jpg', '.jpeg', '.png', '.webp'];
 
-// const uploadProduct = multer({ storage: productStorage, fileFilter, limits });
-// const uploadCategory = multer({ storage: categoryStorage, fileFilter, limits });
-// const uploadPoster   = multer({ storage: posterStorage,   fileFilter, limits });
-
-// module.exports = { uploadProduct, uploadCategory, uploadPoster };
-
-
-const multer  = require('multer');
-const cloudinary = require('../config/cloudinary');
-const path = require('path');
-
-// Use memory storage — no disk writes, buffer goes straight to Cloudinary
-const storage = multer.memoryStorage();
-
-// const fileFilter = (req, file, cb) => {
-//      console.log("UPLOAD MIME TYPE:", file.mimetype);
-//     console.log("UPLOAD ORIGINAL NAME:", file.originalname);
-//     const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-//     if (allowed.includes(file.mimetype)) {
+//     if (allowedMime.includes(file.mimetype) || allowedExt.includes(ext)) {
 //         cb(null, true);
 //     } else {
 //         cb(new Error('Only JPG, PNG, and WEBP images are allowed'), false);
 //     }
 // };
 
+// const limits = { fileSize: 4 * 1024 * 1024 }; // 4MB
+
+// // One multer instance — reuse for products, categories, posters
+// const upload = multer({ storage, fileFilter, limits });
+
+// // /**
+// //  * Uploads a single buffer to Cloudinary.
+// //  * @param {Buffer} buffer   - file buffer from multer memoryStorage
+// //  * @param {string} folder   - Cloudinary folder name e.g. 'products'
+// //  * @param {object} options  - extra Cloudinary upload options (optional)
+// //  * @returns {{ url, publicId }}
+// //  */
+// const uploadToCloudinary = (buffer, folder, options = {}) => {
+//     return new Promise((resolve, reject) => {
+//         const stream = cloudinary.uploader.upload_stream(
+//             {
+//                 folder,
+//                 resource_type: 'image',
+//                 timeout: 60000, // Set timeout to 60 seconds
+//                 ...options,
+//             },
+//             (error, result) => {
+//              if (error) {
+//     console.error("Cloudinary upload failed:", error);
+//     return reject(new Error(error.message || "Cloudinary upload failed"));
+// }
+//                 resolve({ url: result.secure_url, publicId: result.public_id });
+//             }
+//         );
+//         stream.on('error', (err) => {
+//             console.error("Stream Error:", err);
+//             reject(err);
+//         });
+        
+//         stream.end(buffer);
+//     });
+// };
+
+// module.exports = { upload, uploadToCloudinary };
+
+
+const multer = require('multer');
+const cloudinary = require('../config/cloudinary');
+const path = require('path');
+
+// Use memory storage — no disk writes, buffer goes straight to Cloudinary
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
     const allowedMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-
     const ext = path.extname(file.originalname).toLowerCase();
     const allowedExt = ['.jpg', '.jpeg', '.png', '.webp'];
 
@@ -56,13 +116,13 @@ const limits = { fileSize: 4 * 1024 * 1024 }; // 4MB
 // One multer instance — reuse for products, categories, posters
 const upload = multer({ storage, fileFilter, limits });
 
-// /**
-//  * Uploads a single buffer to Cloudinary.
-//  * @param {Buffer} buffer   - file buffer from multer memoryStorage
-//  * @param {string} folder   - Cloudinary folder name e.g. 'products'
-//  * @param {object} options  - extra Cloudinary upload options (optional)
-//  * @returns {{ url, publicId }}
-//  */
+/**
+ * Uploads a single buffer to Cloudinary.
+ * @param {Buffer} buffer   - file buffer from multer memoryStorage
+ * @param {string} folder   - Cloudinary folder name e.g. 'products'
+ * @param {object} options  - extra Cloudinary upload options (optional)
+ * @returns {{ url, publicId, bgRemovedUrl }}
+ */
 const uploadToCloudinary = (buffer, folder, options = {}) => {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -73,13 +133,25 @@ const uploadToCloudinary = (buffer, folder, options = {}) => {
                 ...options,
             },
             (error, result) => {
-             if (error) {
-    console.error("Cloudinary upload failed:", error);
-    return reject(new Error(error.message || "Cloudinary upload failed"));
-}
-                resolve({ url: result.secure_url, publicId: result.public_id });
+                if (error) {
+                    console.error("Cloudinary upload failed:", error);
+                    return reject(new Error(error.message || "Cloudinary upload failed"));
+                }
+                
+                // Generate background-removed URL
+                const bgRemovedUrl = cloudinary.url(result.public_id, {
+                    effect: "background_removal",
+                    format: "png"
+                });
+                
+                resolve({ 
+                    url: result.secure_url, 
+                    publicId: result.public_id,
+                    bgRemovedUrl: bgRemovedUrl // Add background removed URL
+                });
             }
         );
+        
         stream.on('error', (err) => {
             console.error("Stream Error:", err);
             reject(err);
@@ -89,4 +161,64 @@ const uploadToCloudinary = (buffer, folder, options = {}) => {
     });
 };
 
-module.exports = { upload, uploadToCloudinary };
+/**
+ * Uploads a buffer to Cloudinary with background removal during upload
+ * Note: This is the legacy method that replaces the original image
+ * @param {Buffer} buffer   - file buffer from multer memoryStorage
+ * @param {string} folder   - Cloudinary folder name e.g. 'products'
+ * @param {object} options  - extra Cloudinary upload options (optional)
+ * @returns {{ url, publicId }}
+ */
+const uploadToCloudinaryWithBgRemoval = (buffer, folder, options = {}) => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                resource_type: 'image',
+                background_removal: "cloudinary_ai", // Remove background during upload
+                format: "png", // Force PNG format for transparency
+                timeout: 120000, // Longer timeout for AI processing
+                ...options,
+            },
+            (error, result) => {
+                if (error) {
+                    console.error("Cloudinary upload with bg removal failed:", error);
+                    return reject(new Error(error.message || "Cloudinary background removal failed"));
+                }
+                
+                resolve({ 
+                    url: result.secure_url, 
+                    publicId: result.public_id 
+                });
+            }
+        );
+        
+        stream.on('error', (err) => {
+            console.error("Stream Error:", err);
+            reject(err);
+        });
+        
+        stream.end(buffer);
+    });
+};
+
+/**
+ * Generates a background-removed URL from an existing Cloudinary public ID
+ * @param {string} publicId - Cloudinary public ID
+ * @param {object} options - Additional transformation options
+ * @returns {string} URL with background removal effect
+ */
+const getBackgroundRemovedUrl = (publicId, options = {}) => {
+    return cloudinary.url(publicId, {
+        effect: "background_removal",
+        format: "png",
+        ...options
+    });
+};
+
+module.exports = { 
+    upload, 
+    uploadToCloudinary, 
+    uploadToCloudinaryWithBgRemoval,
+    getBackgroundRemovedUrl 
+};
