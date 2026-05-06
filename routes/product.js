@@ -225,31 +225,6 @@ router.get(
   }),
 );
 
-// ─── GET BY ID ───────────────────────────────────────────────────────────────
-router.get(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const product = await Product.findById(req.params.id)
-      .populate("proCategoryId", "id name")
-      .populate("proSubCategoryId", "id name")
-      .populate("proBrandId", "id name")
-      .populate("proVariantTypeId", "id name")
-      .populate("proVariantId", "id name")
-      .populate("adminId", "name");
-
-    if (!product) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Product not found." });
-    }
-    res.json({
-      success: true,
-      message: "Product retrieved successfully.",
-      data: product,
-    });
-  }),
-);
-
 // ─── GET TRENDING (most ordered in last 7 days) ──────────────────────────────
 router.get(
   "/trending/week",
@@ -262,7 +237,7 @@ router.get(
 
     // 1. Aggregate orders from the past 7 days → count per productID
     const trendingAgg = await Order.aggregate([
-      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      { $match: { orderDate: { $gte: sevenDaysAgo } } },
       { $unwind: "$items" },
       {
         $group: {
@@ -308,6 +283,31 @@ router.get(
       data: products,
     });
   })
+);
+
+// ─── GET BY ID ───────────────────────────────────────────────────────────────
+router.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const product = await Product.findById(req.params.id)
+      .populate("proCategoryId", "id name")
+      .populate("proSubCategoryId", "id name")
+      .populate("proBrandId", "id name")
+      .populate("proVariantTypeId", "id name")
+      .populate("proVariantId", "id name")
+      .populate("adminId", "name");
+
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found." });
+    }
+    res.json({
+      success: true,
+      message: "Product retrieved successfully.",
+      data: product,
+    });
+  }),
 );
 
 // ─── CREATE ──────────────────────────────────────────────────────────────────
