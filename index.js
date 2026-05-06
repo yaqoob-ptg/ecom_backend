@@ -69,6 +69,7 @@ const mongoose = require('mongoose');
 const asyncHandler = require('express-async-handler');
 const dotenv = require('dotenv');
 
+
 dotenv.config();
 
 const app = express();
@@ -148,6 +149,7 @@ app.use('/super-admin',require('./routes/superAdmin'));
 app.use('/orders', require('./routes/order'));
 app.use('/payment', require('./routes/payment'));
 app.use('/notification', require('./routes/notification'));
+app.use("/reviews", require("./routes/reviews"));
 
 
 // Example route using asyncHandler directly in app.js
@@ -162,16 +164,16 @@ app.use((error, req, res, next) => {
 
 
 //for running localhost
-// const PORT = process.env.PORT || 3000; 
+const PORT = process.env.PORT || 3000; 
 
-// app.listen(PORT, () => {
-//     console.log(`Local host running on http://localhost:${process.env.PORT}`);
-//     // ngrok.connect(PORT).then(ngrokUrl=>{
-//     //     console.log(`Ngrok URL: ${ngrokUrl}`);
-//     // }).catch(error=>{
-//     //     console.error('Error connecting to ngrok:', error);
-//     // })
-// });
+app.listen(PORT, () => {
+    console.log(`Local host running on http://localhost:${process.env.PORT}`);
+    // ngrok.connect(PORT).then(ngrokUrl=>{
+    //     console.log(`Ngrok URL: ${ngrokUrl}`);
+    // }).catch(error=>{
+    //     console.error('Error connecting to ngrok:', error);
+    // })
+});
 
 //do not use app.listen when deploying to vercel, vercel will handle the server for you
 module.exports = app;
