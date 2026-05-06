@@ -114,6 +114,7 @@ const nodemailer = require("nodemailer");
 const User = require("../model/user");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const { upload, uploadToCloudinary } = require('../middleware/uploadMiddleware');
 
 // ─── Email Transporter ─────────────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
@@ -1402,38 +1403,93 @@ router.post(
   }),
 );
 
-// ─── Update User ───────────────────────────────────────────────────────────────
+// // ─── Update User ───────────────────────────────────────────────────────────────
+// router.put(
+//   "/:id",
+//   asyncHandler(async (req, res) => {
+//     const { name, phone, password, role } = req.body;
+
+//     const updateFields = { updatedAt: Date.now() };
+//     if (name) updateFields.name = name;
+//     if (phone) updateFields.phone = phone;
+//     if (role) updateFields.role = role;
+//     if (password) updateFields.password = await bcrypt.hash(password, 12);
+
+//     const updatedUser = await User.findByIdAndUpdate(
+//       req.params.id,
+//       updateFields,
+//       { new: true },
+//     ).select("-password -verificationToken -verificationTokenExpires");
+
+//     if (!updatedUser) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "User not found." });
+//     }
+
+//     res.json({
+//       success: true,
+//       message: "User updated successfully.",
+//       data: updatedUser,
+//     });
+//   }),
+// );
+// In your users.js router
 router.put(
   "/:id",
+  upload.single('profileImage'), // Add multer middleware
   asyncHandler(async (req, res) => {
-    const { name, phone, password, role } = req.body;
+    const { name, phone, location } = req.body;
+    const userId = req.params.id;
 
     const updateFields = { updatedAt: Date.now() };
-    if (name) updateFields.name = name;
-    if (phone) updateFields.phone = phone;
-    if (role) updateFields.role = role;
-    if (password) updateFields.password = await bcrypt.hash(password, 12);
+    
+    if (name !== undefined) updateFields.name = name;
+    if (phone !== undefined) updateFields.phone = phone;
+    if (location !== undefined) updateFields.location = location;
+
+    // Handle image upload via Cloudinary
+    if (req.file) {
+      try {
+        const result = await uploadToCloudinary(
+          req.file.buffer,
+          'profile-images',
+          {
+            transformation: [
+              { width: 400, height: 400, crop: 'fill', gravity: 'face' }
+            ]
+          }
+        );
+        updateFields.profileImage = result.url;
+        updateFields.profileImageId = result.publicId;
+      } catch (error) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload profile image",
+        });
+      }
+    }
 
     const updatedUser = await User.findByIdAndUpdate(
-      req.params.id,
+      userId,
       updateFields,
-      { new: true },
+      { new: true }
     ).select("-password -verificationToken -verificationTokenExpires");
 
     if (!updatedUser) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
     }
 
     res.json({
       success: true,
-      message: "User updated successfully.",
+      message: "Profile updated successfully",
       data: updatedUser,
     });
   }),
 );
-
 // ─── Delete User ───────────────────────────────────────────────────────────────
 router.delete(
   "/:id",
