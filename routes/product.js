@@ -360,8 +360,9 @@ router.post(
             // Use bgRemovedUrl as the main image URL
             imageUrls.push({ 
               image: i + 1, 
-              url: result.bgRemovedUrl,      // Background-removed PNG URL
-              originalUrl: result.url,        // Original URL as fallback
+              // url: result.bgRemovedUrl,      // Background-removed PNG URL
+              // originalUrl: result.url,        // Original URL as fallback
+              url: result.url, 
               publicId: result.publicId 
             });
             
@@ -557,7 +558,7 @@ router.post(
 //   })
 // );
 
-// ─── UPDATE ──────────────────────────────────────────────────────────────────
+
 // ─── UPDATE ──────────────────────────────────────────────────────────────────
 router.put(
   "/:id",
@@ -629,8 +630,9 @@ router.put(
 
           // Use background-removed URL
           if (existing) {
-            existing.url = result.bgRemovedUrl;        // Background-removed PNG
-            existing.originalUrl = result.url;          // Original as fallback
+            // existing.url = result.bgRemovedUrl;        // Background-removed PNG
+            // existing.originalUrl = result.url;          // Original as fallback
+            existing.url = result.url;     
             existing.publicId = result.publicId;
           } else {
             product.images.push({ 

@@ -138,16 +138,16 @@ const uploadToCloudinary = (buffer, folder, options = {}) => {
                     return reject(new Error(error.message || "Cloudinary upload failed"));
                 }
                 
-                // Generate background-removed URL
-                const bgRemovedUrl = cloudinary.url(result.public_id, {
-                    effect: "background_removal",
-                    format: "png"
-                });
+                // // Generate background-removed URL
+                // const bgRemovedUrl = cloudinary.url(result.public_id, {
+                //     effect: "background_removal",
+                //     format: "png"
+                // });
                 
                 resolve({ 
                     url: result.secure_url, 
                     publicId: result.public_id,
-                    bgRemovedUrl: bgRemovedUrl // Add background removed URL
+                    // bgRemovedUrl: bgRemovedUrl // Add background removed URL
                 });
             }
         );

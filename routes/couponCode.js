@@ -196,50 +196,37 @@ router.delete(
     }
   }),
 );
-
 router.post(
   "/check-coupon",
   asyncHandler(async (req, res) => {
-    console.log(req.body);
     const { couponCode, productIds, purchaseAmount } = req.body;
 
     try {
-      // Find the coupon with the provided coupon code
       const coupon = await Coupon.findOne({ couponCode });
 
-      // If coupon is not found, return false
       if (!coupon) {
         return res.json({ success: false, message: "Coupon not found." });
       }
 
-      // Check if the coupon is expired
+      // 1. Basic Status & Expiry Checks
       const currentDate = new Date();
       if (coupon.endDate < currentDate) {
         return res.json({ success: false, message: "Coupon is expired." });
       }
 
-      // Check if the coupon is active
       if (coupon.status !== "active") {
         return res.json({ success: false, message: "Coupon is inactive." });
       }
 
-      // Check if the purchase amount is greater than the minimum purchase amount specified in the coupon
-      if (
-        coupon.minimumPurchaseAmount &&
-        purchaseAmount < coupon.minimumPurchaseAmount
-      ) {
+      if (coupon.minimumPurchaseAmount && purchaseAmount < coupon.minimumPurchaseAmount) {
         return res.json({
           success: false,
-          message: "Minimum purchase amount not met.",
+          message: `Minimum purchase amount of ${coupon.minimumPurchaseAmount} not met.`,
         });
       }
 
-      // Check if the coupon is applicable for all orders
-      if (
-        !coupon.applicableCategory &&
-        !coupon.applicableSubCategory &&
-        !coupon.applicableProduct
-      ) {
+      // 2. Global Coupon Check
+      if (!coupon.applicableCategory && !coupon.applicableSubCategory && !coupon.applicableProduct) {
         return res.json({
           success: true,
           message: "Coupon is applicable for all orders.",
@@ -247,73 +234,184 @@ router.post(
         });
       }
 
-      // Fetch the products from the database using the provided product IDs
-      //   const products = await Product.find({ _id: { $in: productIds } });
+      // 3. Fetch products (Variant ID removed from select)
       const products = await Product.find({ _id: { $in: productIds } }).select(
-        "_id adminId proCategoryId proSubCategoryId",
+        "_id adminId proCategoryId proSubCategoryId"
       );
 
+      // 4. Admin/Vendor Ownership Check
       const allBelongToAdmin = products.every(
-        (p) => p.adminId.toString() === coupon.adminId.toString(),
+        (p) => p.adminId && p.adminId.toString() === coupon.adminId.toString()
       );
+
       if (!allBelongToAdmin) {
         return res.json({
           success: false,
-          message: "Coupon is not valid for these products.",
+          message: "Coupon is not valid for products from this vendor.",
         });
       }
-      // Check if any product in the list is not applicable for the coupon
+
+      // 5. Categorization and Specific Product Logic
       const isValid = products.every((product) => {
-        if (
-          coupon.applicableCategory &&
-          coupon.applicableCategory.toString() !==
-            product.proCategoryId.toString()
-        ) {
-          return false;
-        }
-        if (
-          coupon.applicableSubCategory &&
-          coupon.applicableSubCategory.toString() !==
-            product.proSubCategoryId.toString()
-        ) {
-          return false;
+        // Category constraint
+        if (coupon.applicableCategory && product.proCategoryId) {
+          if (coupon.applicableCategory.toString() !== product.proCategoryId.toString()) {
+            return false;
+          }
         }
 
-        //have to coment it as cloude says
-        if (
-          coupon.applicableProduct &&
-          !product.proVariantId.includes(coupon.applicableProduct.toString())
-        ) {
-          return false;
+        // Sub-Category constraint
+        if (coupon.applicableSubCategory && product.proSubCategoryId) {
+          if (coupon.applicableSubCategory.toString() !== product.proSubCategoryId.toString()) {
+            return false;
+          }
         }
-        if (
-          coupon.applicableProduct &&
-          coupon.applicableProduct.toString() !== product._id.toString()
-        ) {
-          return false;
+
+        // Specific Product constraint (Variant check removed)
+        if (coupon.applicableProduct) {
+          if (coupon.applicableProduct.toString() !== product._id.toString()) {
+            return false;
+          }
         }
+
         return true;
       });
 
       if (isValid) {
         return res.json({
           success: true,
-          message: "Coupon is applicable for the provided products.",
+          message: "Coupon applied successfully!",
           data: coupon,
         });
       } else {
         return res.json({
           success: false,
-          message: "Coupon is not applicable for the provided products.",
+          message: "This coupon is not applicable to some items in your cart.",
         });
       }
     } catch (error) {
       console.error("Error checking coupon code:", error);
-      return res
-        .status(500)
-        .json({ success: false, message: "Internal server error." });
+      return res.status(500).json({ success: false, message: "Internal server error." });
     }
-  }),
+  })
 );
+// router.post(
+//   "/check-coupon",
+//   asyncHandler(async (req, res) => {
+//     console.log(req.body);
+//     const { couponCode, productIds, purchaseAmount } = req.body;
+
+//     try {
+//       // Find the coupon with the provided coupon code
+//       const coupon = await Coupon.findOne({ couponCode });
+
+//       // If coupon is not found, return false
+//       if (!coupon) {
+//         return res.json({ success: false, message: "Coupon not found." });
+//       }
+
+//       // Check if the coupon is expired
+//       const currentDate = new Date();
+//       if (coupon.endDate < currentDate) {
+//         return res.json({ success: false, message: "Coupon is expired." });
+//       }
+
+//       // Check if the coupon is active
+//       if (coupon.status !== "active") {
+//         return res.json({ success: false, message: "Coupon is inactive." });
+//       }
+
+//       // Check if the purchase amount is greater than the minimum purchase amount specified in the coupon
+//       if (
+//         coupon.minimumPurchaseAmount &&
+//         purchaseAmount < coupon.minimumPurchaseAmount
+//       ) {
+//         return res.json({
+//           success: false,
+//           message: "Minimum purchase amount not met.",
+//         });
+//       }
+
+//       // Check if the coupon is applicable for all orders
+//       if (
+//         !coupon.applicableCategory &&
+//         !coupon.applicableSubCategory &&
+//         !coupon.applicableProduct
+//       ) {
+//         return res.json({
+//           success: true,
+//           message: "Coupon is applicable for all orders.",
+//           data: coupon,
+//         });
+//       }
+
+//       // Fetch the products from the database using the provided product IDs
+//       //   const products = await Product.find({ _id: { $in: productIds } });
+//       const products = await Product.find({ _id: { $in: productIds } }).select(
+//         "_id adminId proCategoryId proSubCategoryId",
+//       );
+
+//       const allBelongToAdmin = products.every(
+//         (p) => p.adminId.toString() === coupon.adminId.toString(),
+//       );
+//       if (!allBelongToAdmin) {
+//         return res.json({
+//           success: false,
+//           message: "Coupon is not valid for these products.",
+//         });
+//       }
+//       // Check if any product in the list is not applicable for the coupon
+//       const isValid = products.every((product) => {
+//         if (
+//           coupon.applicableCategory &&
+//           coupon.applicableCategory.toString() !==
+//             product.proCategoryId.toString()
+//         ) {
+//           return false;
+//         }
+//         if (
+//           coupon.applicableSubCategory &&
+//           coupon.applicableSubCategory.toString() !==
+//             product.proSubCategoryId.toString()
+//         ) {
+//           return false;
+//         }
+
+//         //have to coment it as cloude says
+//         if (
+//           coupon.applicableProduct &&
+//           !product.proVariantId.includes(coupon.applicableProduct.toString())
+//         ) {
+//           return false;
+//         }
+//         if (
+//           coupon.applicableProduct &&
+//           coupon.applicableProduct.toString() !== product._id.toString()
+//         ) {
+//           return false;
+//         }
+//         return true;
+//       });
+
+//       if (isValid) {
+//         return res.json({
+//           success: true,
+//           message: "Coupon is applicable for the provided products.",
+//           data: coupon,
+//         });
+//       } else {
+//         return res.json({
+//           success: false,
+//           message: "Coupon is not applicable for the provided products.",
+//         });
+//       }
+//     } catch (error) {
+//       console.error("Error checking coupon code:", error);
+//       return res
+//         .status(500)
+//         .json({ success: false, message: "Internal server error." });
+//     }
+//   }),
+// );
 
 module.exports = router;

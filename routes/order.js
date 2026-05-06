@@ -19,7 +19,6 @@
 //     }
 // }));
 
-
 // router.get('/orderByUserId/:userId', asyncHandler(async (req, res) => {
 //     try {
 //         const userId = req.params.userId;
@@ -32,7 +31,6 @@
 //         res.status(500).json({ success: false, message: error.message });
 //     }
 // }));
-
 
 // // Get an order by ID
 // router.get('/:id', asyncHandler(async (req, res) => {
@@ -107,218 +105,307 @@
 
 // module.exports = router;
 
-
-
-
-const express = require('express');
-const asyncHandler = require('express-async-handler');
+const express = require("express");
+const asyncHandler = require("express-async-handler");
 const router = express.Router();
-const Order = require('../model/order');
-const Product = require('../model/product');
-const Coupon = require('../model/couponCode');
-const auth = require('../middleware/auth');
+const Order = require("../model/order");
+const Product = require("../model/product");
+const Coupon = require("../model/couponCode");
+const auth = require("../middleware/auth");
+const mongoose = require('mongoose');
 
 router.use(auth);
 
 // Get all orders — admin sees only their own, superadmin/moderator sees all
-router.get('/', asyncHandler(async (req, res) => {
+router.get(
+  "/",
+  asyncHandler(async (req, res) => {
     try {
-        let filter = {};
-        if (req.user.role === 'admin') {
-            filter.adminId = req.user._id;
-        }
+      let filter = {};
+      if (req.user.role === "admin") {
+        filter.adminId = req.user._id;
+      }
 
-        const orders = await Order.find(filter)
-            .populate('couponCode', 'id couponCode discountType discountAmount')
-            .populate('userID', 'id name')
-            .populate('adminId', 'name email') 
-            .sort({ _id: -1 });
+      const orders = await Order.find(filter)
+        .populate("couponCode", "id couponCode discountType discountAmount")
+        .populate("userID", "id name")
+        .populate("adminId", "name email")
+        .sort({ _id: -1 });
 
-        res.json({ success: true, message: "Orders retrieved successfully.", data: orders });
+      res.json({
+        success: true,
+        message: "Orders retrieved successfully.",
+        data: orders,
+      });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message });
     }
-}));
+  }),
+);
 
 // Get orders by user ID
-router.get('/orderByUserId/:userId', asyncHandler(async (req, res) => {
+router.get(
+  "/orderByUserId/:userId",
+  asyncHandler(async (req, res) => {
     try {
-        const userId = req.params.userId;
-        const orders = await Order.find({ userID: userId })
-            .populate('couponCode', 'id couponCode discountType discountAmount')
-            .populate('userID', 'id name')
-            .sort({ _id: -1 });
+      const userId = req.params.userId;
+      const orders = await Order.find({ userID: userId })
+        .populate("couponCode", "id couponCode discountType discountAmount")
+        .populate("userID", "id name")
+        .sort({ _id: -1 });
 
-        res.json({ success: true, message: "Orders retrieved successfully.", data: orders });
+      res.json({
+        success: true,
+        message: "Orders retrieved successfully.",
+        data: orders,
+      });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message });
     }
-}));
+  }),
+);
 
 // Get a single order by ID
-router.get('/:id', asyncHandler( async (req, res) => {
+router.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
     try {
-        const order = await Order.findById(req.params.id)
-            .populate('couponCode', 'id couponCode discountType discountAmount')
-            .populate('userID', 'id name');
+      const order = await Order.findById(req.params.id)
+        .populate("couponCode", "id couponCode discountType discountAmount")
+        .populate("userID", "id name");
 
-        if (!order) {
-            return res.status(404).json({ success: false, message: "Order not found." });
-        }
+      if (!order) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Order not found." });
+      }
 
-        // Admin can only view their own orders
-        if (req.user.role === 'admin' && order.adminId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ success: false, message: "Access denied." });
-        }
+      // Admin can only view their own orders
+      if (
+        req.user.role === "admin" &&
+        order.adminId.toString() !== req.user._id.toString()
+      ) {
+        return res
+          .status(403)
+          .json({ success: false, message: "Access denied." });
+      }
 
-        res.json({ success: true, message: "Order retrieved successfully.", data: order });
+      res.json({
+        success: true,
+        message: "Order retrieved successfully.",
+        data: order,
+      });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message });
     }
-}));
+  }),
+);
 
 // Create orders — splits by adminId, applies coupon only to the matching admin
-router.post('/', asyncHandler(async (req, res) => {
+router.post(
+  "/",
+  asyncHandler(async (req, res) => {
     const {
-        userID,
-        orderStatus,
-        items,           // [{ productID, productName, quantity, price, variant }]
-        shippingAddress,
-        paymentMethod,
-        couponCode,      // coupon code string (optional)
-        trackingUrl
+      userID,
+      orderStatus,
+      items, // [{ productID, productName, quantity, price, variant }]
+      shippingAddress,
+      paymentMethod,
+      couponCode, // coupon code string (optional)
+      trackingUrl,
     } = req.body;
 
-    if (!userID || !items || !items.length || !shippingAddress || !paymentMethod) {
-        return res.status(400).json({
-            success: false,
-            message: "userID, items, shippingAddress, and paymentMethod are required."
-        });
+    if (
+      !userID ||
+      !items ||
+      !items.length ||
+      !shippingAddress ||
+      !paymentMethod
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "userID, items, shippingAddress, and paymentMethod are required.",
+      });
     }
 
     try {
-        // 1. Fetch all products to get their adminId
-        const productIDs = items.map(i => i.productID);
-        const products = await Product.find({ _id: { $in: productIDs } }).select('_id adminId');
+      // 1. Fetch all products to get their adminId
+      const productIDs = items.map((i) => i.productID);
+      const products = await Product.find({ _id: { $in: productIDs } }).select(
+        "_id adminId",
+      );
 
-        const productAdminMap = {};
-        products.forEach(p => {
-            productAdminMap[p._id.toString()] = p.adminId.toString();
+      const productAdminMap = {};
+      products.forEach((p) => {
+        productAdminMap[p._id.toString()] = p.adminId.toString();
+      });
+
+      // 2. Group items by adminId
+      const adminItemsMap = {};
+      for (const item of items) {
+        const adminId = productAdminMap[item.productID.toString()];
+        if (!adminId) continue; // skip if product not found
+        if (!adminItemsMap[adminId]) adminItemsMap[adminId] = [];
+        adminItemsMap[adminId].push(item);
+      }
+
+      // // 3. Resolve coupon if provided
+      // let couponDoc = null;
+      // if (couponCode) {
+      //     couponDoc = await Coupon.findOne({ couponCode, status: 'active' });
+      //     if (couponDoc && couponDoc.endDate < new Date()) {
+      //         couponDoc = null; // expired, treat as no coupon
+      //     }
+      // }
+      // 3. Resolve coupon if provided
+      let couponDoc = null;
+      if (couponCode) {
+        // We check if the incoming 'couponCode' is a valid MongoDB ID
+        const isId = mongoose.Types.ObjectId.isValid(couponCode);
+
+        couponDoc = await Coupon.findOne({
+          $or: [
+            { _id: isId ? couponCode : null }, // Look by ID (Primary)
+            { couponCode: couponCode }, // Fallback to name string
+          ],
+          status: "active",
         });
 
-        // 2. Group items by adminId
-        const adminItemsMap = {};
-        for (const item of items) {
-            const adminId = productAdminMap[item.productID.toString()];
-            if (!adminId) continue; // skip if product not found
-            if (!adminItemsMap[adminId]) adminItemsMap[adminId] = [];
-            adminItemsMap[adminId].push(item);
+        if (couponDoc && couponDoc.endDate < new Date()) {
+          couponDoc = null; // Expired
         }
+      }
 
-        // 3. Resolve coupon if provided
-        let couponDoc = null;
-        if (couponCode) {
-            couponDoc = await Coupon.findOne({ couponCode, status: 'active' });
-            if (couponDoc && couponDoc.endDate < new Date()) {
-                couponDoc = null; // expired, treat as no coupon
+      // 4. Create one order per admin
+      const createdOrders = [];
+
+      for (const [adminId, adminItems] of Object.entries(adminItemsMap)) {
+        const subtotal = adminItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0,
+        );
+
+        // Apply coupon only if it belongs to this admin
+        let discount = 0;
+        let appliedCoupon = null;
+
+        if (couponDoc && couponDoc.adminId.toString() === adminId) {
+          if (
+            !couponDoc.minimumPurchaseAmount ||
+            subtotal >= couponDoc.minimumPurchaseAmount
+          ) {
+            if (couponDoc.discountType === "fixed") {
+              discount = Math.min(couponDoc.discountAmount, subtotal);
+            } else if (couponDoc.discountType === "percentage") {
+              discount = parseFloat(
+                ((subtotal * couponDoc.discountAmount) / 100).toFixed(2),
+              );
             }
+            appliedCoupon = couponDoc._id;
+          }
         }
 
-        // 4. Create one order per admin
-        const createdOrders = [];
+        const total = parseFloat((subtotal - discount).toFixed(2));
 
-        for (const [adminId, adminItems] of Object.entries(adminItemsMap)) {
-            const subtotal = adminItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-            // Apply coupon only if it belongs to this admin
-            let discount = 0;
-            let appliedCoupon = null;
-
-            if (couponDoc && couponDoc.adminId.toString() === adminId) {
-                if (!couponDoc.minimumPurchaseAmount || subtotal >= couponDoc.minimumPurchaseAmount) {
-                    if (couponDoc.discountType === 'fixed') {
-                        discount = Math.min(couponDoc.discountAmount, subtotal);
-                    } else if (couponDoc.discountType === 'percentage') {
-                        discount = parseFloat(((subtotal * couponDoc.discountAmount) / 100).toFixed(2));
-                    }
-                    appliedCoupon = couponDoc._id;
-                }
-            }
-
-            const total = parseFloat((subtotal - discount).toFixed(2));
-
-            const order = new Order({
-                userID,
-                adminId,
-                orderStatus: orderStatus || 'pending',
-                items: adminItems,
-                totalPrice: subtotal,
-                shippingAddress,
-                paymentMethod,
-                couponCode: appliedCoupon,
-                orderTotal: { subtotal, discount, total },
-                trackingUrl
-            });
-
-            const saved = await order.save();
-            createdOrders.push(saved._id);
-        }
-
-        res.json({
-            success: true,
-            message: `${createdOrders.length} order(s) created successfully.`,
-            data: { orderIds: createdOrders }
+        const order = new Order({
+          userID,
+          adminId,
+          orderStatus: orderStatus || "pending",
+          items: adminItems,
+          totalPrice: subtotal,
+          shippingAddress,
+          paymentMethod,
+          couponCode: appliedCoupon,
+          orderTotal: { subtotal, discount, total },
+          trackingUrl,
         });
 
+        const saved = await order.save();
+        createdOrders.push(saved._id);
+      }
+
+      res.json({
+        success: true,
+        message: `${createdOrders.length} order(s) created successfully.`,
+        data: { orderIds: createdOrders },
+      });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message });
     }
-}));
+  }),
+);
 
 // Update order status (admin can only update their own)
-router.put('/:id', asyncHandler(async (req, res) => {
+router.put(
+  "/:id",
+  asyncHandler(async (req, res) => {
     try {
-        const { orderStatus, trackingUrl } = req.body;
-        if (!orderStatus) {
-            return res.status(400).json({ success: false, message: "orderStatus is required." });
-        }
+      const { orderStatus, trackingUrl } = req.body;
+      if (!orderStatus) {
+        return res
+          .status(400)
+          .json({ success: false, message: "orderStatus is required." });
+      }
 
-        const order = await Order.findById(req.params.id);
-        if (!order) {
-            return res.status(404).json({ success: false, message: "Order not found." });
-        }
+      const order = await Order.findById(req.params.id);
+      if (!order) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Order not found." });
+      }
 
-        if (req.user.role === 'admin' && order.adminId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ success: false, message: "Access denied." });
-        }
+      if (
+        req.user.role === "admin" &&
+        order.adminId.toString() !== req.user._id.toString()
+      ) {
+        return res
+          .status(403)
+          .json({ success: false, message: "Access denied." });
+      }
 
-        order.orderStatus = orderStatus;
-        if (trackingUrl !== undefined) order.trackingUrl = trackingUrl;
-        await order.save();
+      order.orderStatus = orderStatus;
+      if (trackingUrl !== undefined) order.trackingUrl = trackingUrl;
+      await order.save();
 
-        res.json({ success: true, message: "Order updated successfully.", data: null });
+      res.json({
+        success: true,
+        message: "Order updated successfully.",
+        data: null,
+      });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message });
     }
-}));
+  }),
+);
 
 // Delete order
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
     try {
-        const order = await Order.findById(req.params.id);
-        if (!order) {
-            return res.status(404).json({ success: false, message: "Order not found." });
-        }
+      const order = await Order.findById(req.params.id);
+      if (!order) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Order not found." });
+      }
 
-        if (req.user.role === 'admin' && order.adminId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ success: false, message: "Access denied." });
-        }
+      if (
+        req.user.role === "admin" &&
+        order.adminId.toString() !== req.user._id.toString()
+      ) {
+        return res
+          .status(403)
+          .json({ success: false, message: "Access denied." });
+      }
 
-        await Order.findByIdAndDelete(req.params.id);
-        res.json({ success: true, message: "Order deleted successfully." });
+      await Order.findByIdAndDelete(req.params.id);
+      res.json({ success: true, message: "Order deleted successfully." });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message });
     }
-}));
+  }),
+);
 
 module.exports = router;
