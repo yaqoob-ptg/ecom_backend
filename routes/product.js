@@ -215,7 +215,7 @@ router.get(
       .populate("proBrandId", "id name")
       .populate("proVariantTypeId", "id type")
       .populate("proVariantId", "id name")
-      .populate("adminId", "name");
+      .populate("adminId", "name profileImage")
 
     res.json({
       success: true,
@@ -266,7 +266,7 @@ router.get(
       .populate("proSubCategoryId", "id name")
       .populate("proBrandId", "id name")
       .populate("proVariantTypeId", "id type")
-      .populate("adminId", "name");
+      .populate("adminId", "name profileImage")
 
     // 3. Re-sort products to match the aggregation order (highest first)
     const orderMap = Object.fromEntries(
@@ -295,7 +295,7 @@ router.get(
       .populate("proBrandId", "id name")
       .populate("proVariantTypeId", "id name")
       .populate("proVariantId", "id name")
-      .populate("adminId", "name");
+      .populate("adminId", "name profileImage")
 
     if (!product) {
       return res
